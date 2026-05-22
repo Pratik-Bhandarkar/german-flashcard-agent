@@ -52,3 +52,30 @@ for word in test_words:
     result = llm_client.enrich_word(word)
     for key, value in result.items():
         print(f"  {key}: {value}")
+
+# --- Test 6: Enrichment Agent ---
+print("=== Test 6: Enrichment Agent ===")
+from pipeline.agents import enrichment_agent
+
+words = ["Hund", "laufen", "schön"]
+result = enrichment_agent.run(
+    words=words,
+    source="test run",
+    tags=["test", "B1"]
+)
+
+print(f"\nSuccessfully enriched: {len(result['flashcards'])} cards")
+print(f"Failed: {len(result['failures'])} words")
+
+print("\n--- Flashcards ---")
+for card in result["flashcards"]:
+    print(f"\n  Word:       {card['german_word']}")
+    print(f"  Translation:{card['english_translation']}")
+    print(f"  Class:      {card['word_class']}")
+    print(f"  Gender:     {card['gender']}")
+    print(f"  Plural:     {card['plural_form']}")
+    print(f"  Sentence:   {card['example_sentence_de']}")
+    print(f"  Mnemonic:   {card['mnemonic']}")
+    print(f"  Tags:       {card['tags']}")
+    print(f"  ID:         {card['id']}")
+    print(f"  Created:    {card['created_at']}")

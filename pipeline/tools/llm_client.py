@@ -113,7 +113,7 @@ def _enrich_with_openai(word: str) -> dict:
     response = openai_client.chat.completions.create(
         model=OPENAI_MODEL,
         messages=[
-            # System message sets the behaviour of the model
+            # System message sets the behavior of the model
             {"role": "system", "content": "You are a German language expert."},
             {"role": "user", "content": prompt}
         ]
