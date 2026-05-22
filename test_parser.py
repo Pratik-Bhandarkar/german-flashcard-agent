@@ -79,3 +79,32 @@ for card in result["flashcards"]:
     print(f"  Tags:       {card['tags']}")
     print(f"  ID:         {card['id']}")
     print(f"  Created:    {card['created_at']}")
+
+    # --- Test 7: Validator Agent ---
+print("=== Test 7: Validator Agent ===")
+from pipeline.agents import validator_agent
+
+# Test 7a: Valid flashcards from enrichment agent
+print("\n-- Test 7a: Valid flashcards --")
+validation_result = validator_agent.run(result)
+
+print(f"Valid cards:   {len(validation_result['valid'])}")
+print(f"Invalid cards: {len(validation_result['invalid'])}")
+print(f"Enrich failures: {len(validation_result['enrichment_failures'])}")
+
+# Test 7b: Deliberately broken flashcard
+print("\n-- Test 7b: Deliberately broken flashcard --")
+broken_flashcard = {
+    "id": "test-123",
+    "german_word": "Hund",
+    "english_translation": "dog",
+    "word_class": "noun",
+    # deliberately missing gender, plural_form, sentences, mnemonic
+    "created_at": "2026-05-22"
+}
+
+broken_result = validator_agent.validate_flashcard(broken_flashcard)
+print(f"Is valid: {broken_result['is_valid']}")
+print(f"Errors found:")
+for error in broken_result["errors"]:
+    print(f"  - {error}")
