@@ -108,3 +108,26 @@ print(f"Is valid: {broken_result['is_valid']}")
 print(f"Errors found:")
 for error in broken_result["errors"]:
     print(f"  - {error}")
+
+# --- Test 8: Storage Agent ---
+print("=== Test 8: Storage Agent ===")
+from pipeline.agents import storage_agent
+
+# Save the validated flashcards from Test 7
+print("\n-- Test 8a: Saving valid flashcards --")
+storage_result = storage_agent.run(validation_result)
+
+print(f"\nSaved:   {storage_result['saved']}")
+print(f"Skipped: {storage_result['skipped']}")
+print(f"Failures: {len(storage_result['failures'])}")
+
+# Read them back from the database to confirm they were saved
+print("\n-- Test 8b: Reading back from database --")
+all_cards = storage_agent.get_all_flashcards()
+print(f"Total cards in database: {len(all_cards)}")
+
+for card in all_cards:
+    print(f"\n  Word:    {card['german_word']}")
+    print(f"  Gender:  {card['gender']}")
+    print(f"  Tags:    {card['tags']}")
+    print(f"  Created: {card['created_at']}")
