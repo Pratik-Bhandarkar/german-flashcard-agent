@@ -1,128 +1,70 @@
 # storage_agent.py
-# Responsible for persisting validated flashcards to the SQLite database.
+# Responsible for persisting validated flashcards to the database.
+# Uses SQLAlchemy models instead of raw SQL for type safety and consistency.
 # This is the final agent in the pipeline — it only receives valid flashcards.
 
-import sqlite3
-import json
+from sqlalchemy.orm import Session
 
-from pipeline.config import DATABASE_PATH
-
-
-def _get_connection() -> sqlite3.Connection:
-    """
-    Creates and returns a connection to the SQLite database.
-    The database file is created automatically if it doesn't exist yet.
-    """
-    connection = sqlite3.connect(DATABASE_PATH)
-
-    # Row factory makes rows behave like dictionaries
-    # so we can access columns by name instead of index
-    connection.row_factory = sqlite3.Row
-
-    return connection
+from backend.database.db import SessionLocal, init_db
+from backend.database.models import Flashcard
 
 
-def _create_table_if_not_exists(connection: sqlite3.Connection) -> None:
-    """
-    Creates the flashcards table if it doesn't already exist.
-    Safe to call every time — won't overwrite existing data.
-    """
-    connection.execute("""
-        CREATE TABLE IF NOT EXISTS flashcards (
-            id TEXT PRIMARY KEY,
-            german_word TEXT NOT NULL,
-            english_translation TEXT NOT NULL,
-            word_class TEXT,
-            gender TEXT,
-            plural_form TEXT,
-            example_sentence_de TEXT,
-            example_sentence_en TEXT,
-            mnemonic TEXT,
-            source TEXT,
-            tags TEXT,
-            difficulty TEXT,
-            next_review TEXT,
-            created_at TEXT NOT NULL
-        )
-    """)
-    connection.commit()
-
-
-def _save_flashcard(connection: sqlite3.Connection, flashcard: dict) -> None:
+def _save_flashcard(db: Session, flashcard: dict) -> None:
     """
     Inserts a single flashcard into the database.
     Skips silently if a card with the same ID already exists.
 
     Args:
-        connection: active database connection
+        db: active SQLAlchemy session
         flashcard: validated flashcard dictionary
     """
-    # Tags is a list in Python but SQLite only stores text.
-    # We convert it to a JSON string for storage and back when reading.
-    tags_as_string = json.dumps(flashcard.get("tags", []))
+    # Check if a card with this ID already exists before inserting
+    # This prevents duplicates if the same word list is processed twice
+    existing = db.query(Flashcard).filter(
+        Flashcard.id == flashcard["id"]
+    ).first()
 
-    # INSERT OR IGNORE means if a card with this ID already exists
-    # we skip it instead of throwing an error
-    connection.execute("""
-        INSERT OR IGNORE INTO flashcards (
-            id,
-            german_word,
-            english_translation,
-            word_class,
-            gender,
-            plural_form,
-            example_sentence_de,
-            example_sentence_en,
-            mnemonic,
-            source,
-            tags,
-            difficulty,
-            next_review,
-            created_at
-        ) VALUES (
-            :id,
-            :german_word,
-            :english_translation,
-            :word_class,
-            :gender,
-            :plural_form,
-            :example_sentence_de,
-            :example_sentence_en,
-            :mnemonic,
-            :source,
-            :tags,
-            :difficulty,
-            :next_review,
-            :created_at
-        )
-    """, {**flashcard, "tags": tags_as_string})
+    if existing:
+        print(f"  Skipped (already exists): {flashcard['german_word']}")
+        return
+
+    # Create a SQLAlchemy model instance from the dictionary
+    db_flashcard = Flashcard(
+        id=flashcard["id"],
+        german_word=flashcard["german_word"],
+        english_translation=flashcard["english_translation"],
+        word_class=flashcard.get("word_class"),
+        gender=flashcard.get("gender"),
+        plural_form=flashcard.get("plural_form"),
+        example_sentence_de=flashcard.get("example_sentence_de"),
+        example_sentence_en=flashcard.get("example_sentence_en"),
+        mnemonic=flashcard.get("mnemonic"),
+        source=flashcard.get("source"),
+        tags=flashcard.get("tags", []),
+        difficulty=flashcard.get("difficulty"),
+        next_review=flashcard.get("next_review"),
+        created_at=flashcard["created_at"]
+    )
+
+    db.add(db_flashcard)
 
 
 def get_all_flashcards() -> list[dict]:
     """
-    Retrieves all flashcards from the database.
-    Used later by the FastAPI backend to serve cards to the frontend.
+    Retrieves all flashcards from the database ordered by creation date.
+    Used by the FastAPI backend to serve cards to the frontend.
 
     Returns:
         List of flashcard dictionaries
     """
-    connection = _get_connection()
-    _create_table_if_not_exists(connection)
-
-    cursor = connection.execute(
-        "SELECT * FROM flashcards ORDER BY created_at DESC"
-    )
-    rows = cursor.fetchall()
-    connection.close()
-
-    flashcards = []
-    for row in rows:
-        card = dict(row)
-        # Convert tags back from JSON string to Python list
-        card["tags"] = json.loads(card["tags"]) if card["tags"] else []
-        flashcards.append(card)
-
-    return flashcards
+    db = SessionLocal()
+    try:
+        flashcards = db.query(Flashcard).order_by(
+            Flashcard.created_at.desc()
+        ).all()
+        return [card.to_dict() for card in flashcards]
+    finally:
+        db.close()
 
 
 def run(validation_result: dict) -> dict:
@@ -142,24 +84,32 @@ def run(validation_result: dict) -> dict:
     """
     valid_flashcards = validation_result["valid"]
 
-    connection = _get_connection()
+    # Initialise the database — creates tables if they don't exist
+    init_db()
 
-    # Ensure the table exists before we try to insert anything
-    _create_table_if_not_exists(connection)
-
+    db = SessionLocal()
     saved_count = 0
 
-    for flashcard in valid_flashcards:
-        try:
-            _save_flashcard(connection, flashcard)
-            saved_count += 1
-            print(f"  Saved: {flashcard['german_word']}")
-        except Exception as e:
-            print(f"  Failed to save '{flashcard['german_word']}': {e}")
+    try:
+        for flashcard in valid_flashcards:
+            try:
+                _save_flashcard(db, flashcard)
+                saved_count += 1
+                print(f"  Saved: {flashcard['german_word']}")
+            except Exception as e:
+                print(f"  Failed to save '{flashcard['german_word']}': {e}")
 
-    # Commit all inserts in one go — more efficient than committing one by one
-    connection.commit()
-    connection.close()
+        # Commit all inserts in one go
+        db.commit()
+
+    except Exception as e:
+        # If anything goes wrong roll back all inserts
+        # so we never end up with partial data in the database
+        db.rollback()
+        raise e
+
+    finally:
+        db.close()
 
     skipped_count = len(validation_result["invalid"])
     all_failures = (
