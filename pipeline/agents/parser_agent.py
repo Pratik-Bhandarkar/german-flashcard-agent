@@ -41,9 +41,9 @@ def extract_from_image(image_path: str) -> list[str]:
     # lang="deu" tells Tesseract to expect German text
     # This improves accuracy for German characters like ä, ö, ü, ß
     raw_text = pytesseract.image_to_string(image, lang="deu")
-
+    words = extract_from_text(raw_text)
     # Reuse our text extractor to clean and split the OCR output
-    return extract_from_text(raw_text)
+    return clean_word_list(words)
 
 
 def extract_from_pdf(pdf_path: str) -> list[str]:
@@ -60,8 +60,9 @@ def extract_from_pdf(pdf_path: str) -> list[str]:
         all_text += page.get_text()
 
     pdf_document.close()
-
-    return extract_from_text(all_text)
+    
+    words = extract_from_text(all_text)
+    return clean_word_list(words)
 
 
 def run(input_type: str, input_data: str) -> list[str]:
@@ -94,3 +95,49 @@ def run(input_type: str, input_data: str) -> list[str]:
         if not Path(input_data).exists():
             raise FileNotFoundError(f"PDF file not found: {input_data}")
         return extract_from_pdf(input_data)
+    
+
+def clean_word_list(words: list[str]) -> list[str]:
+    """
+    Cleans a raw word list extracted from OCR or PDF text.
+    Removes articles, filler words, numbers, short tokens, duplicates,
+    and strips special characters from otherwise valid words.
+    """
+    import re
+
+    ARTICLES = {"der", "die", "das", "ein", "eine"}
+
+    FILLER_WORDS = {
+        "er", "sie", "hat", "ist", "sein", "haben",
+        "nicht", "zum", "zur", "vom", "beim", "im",
+        "an", "zu", "um", "auf", "aus", "mit"
+    }
+
+    cleaned = []
+    # Track seen words to eliminate duplicates
+    seen = set()
+
+    for word in words:
+        stripped = re.sub(r"[^a-zA-ZäöüÄÖÜß]", "", word)
+
+        if not stripped:
+            continue
+        if len(stripped) <= 3:
+            continue
+        if stripped.isupper():
+            continue
+        if stripped.lower() in ARTICLES:
+            continue
+        if stripped.lower() in FILLER_WORDS:
+            continue
+        if stripped.isnumeric():
+            continue
+
+        # Skip if we have already added this word
+        if stripped.lower() in seen:
+            continue
+
+        seen.add(stripped.lower())
+        cleaned.append(stripped)
+
+    return cleaned

@@ -94,6 +94,12 @@ def run(
         print(f"Enriching: {word}...")
         try:
             llm_data = llm_client.enrich_word(word)
+
+            # LLM flagged this as not a real German word — skip it
+            if not llm_data.get("is_valid", True):
+                print(f"  Skipped (not a valid word): {word}")
+                continue
+
             flashcard = _build_flashcard(
                 german_word=word,
                 english_translation=translation,
@@ -104,8 +110,6 @@ def run(
             flashcards.append(flashcard)
 
         except Exception as e:
-            # If enrichment fails for one word we log it and continue.
-            # We never let one bad word crash the entire batch.
             print(f"  Failed to enrich '{word}': {e}")
             failures.append({"word": word, "error": str(e)})
 

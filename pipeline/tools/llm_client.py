@@ -24,14 +24,23 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 # This is the instruction we send to the LLM for every word.
 # It is defined here as a constant so it is easy to find and improve.
 ENRICHMENT_PROMPT_TEMPLATE = """
-You are a German language expert. Given a German word, return a JSON object with the following fields:
+You are a German language expert. Given a German word, return a JSON object.
 
-- word_class: one of "noun", "verb", "adjective", "adverb", "other"
-- gender: "der", "die", "das", or null if not a noun
-- plural_form: the plural form of the word, or null if not a noun
-- example_sentence_de: a simple, natural German sentence using the word
-- example_sentence_en: the English translation of that sentence
-- mnemonic: a creative memory hook in English to help an English speaker remember the German word, the memory hook shouldn't be too long, ideally just one sentence or phrase.
+First check if the input is a real, standalone German vocabulary word.
+If it is NOT a real German word, a word fragment, or a conjugated/declined 
+verb form, return exactly this JSON:
+{{"is_valid": false}}
+
+If it IS a valid German word, return:
+{{
+    "is_valid": true,
+    "word_class": one of "noun", "verb", "adjective", "adverb", "other",
+    "gender": "der", "die", "das", or null if not a noun,
+    "plural_form": the plural form or null if not a noun,
+    "example_sentence_de": a simple natural German sentence using the word,
+    "example_sentence_en": English translation of that sentence,
+    "mnemonic": a creative memory hook in English to help an English speaker remember the German word
+}}
 
 Return ONLY the JSON object. No explanation, no markdown, no extra text.
 
