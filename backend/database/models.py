@@ -4,7 +4,7 @@
 # This is the single source of truth for our database schema.
 
 from sqlalchemy import (
-    Column, String, Text, JSON
+    Column, Integer, String, Text, JSON
 )
 from sqlalchemy.orm import DeclarativeBase
 
@@ -52,6 +52,9 @@ class Flashcard(Base):
     # Timestamp
     created_at = Column(String, nullable=False)
 
+    # Set when this card was imported from the vocabulary library
+    seeded_from = Column(String)
+
     def to_dict(self) -> dict:
         """
         Converts the SQLAlchemy model instance to a plain dictionary.
@@ -72,5 +75,42 @@ class Flashcard(Base):
             "tags": self.tags or [],
             "difficulty": self.difficulty,
             "next_review": self.next_review,
-            "created_at": self.created_at
+            "created_at": self.created_at,
+            "seeded_from": self.seeded_from,
+        }
+
+
+class SeedWord(Base):
+    __tablename__ = "seed_words"
+
+    id = Column(String, primary_key=True)        # e.g. "b1_001"
+    level = Column(String, nullable=False)        # "B1", "A1", …
+    lesson = Column(String)                       # "Lesson 1 — Alltag und Wohnen"
+    lesson_number = Column(Integer)
+
+    german_word = Column(String, nullable=False)
+    english_translation = Column(String, nullable=False)
+    word_class = Column(String)
+    gender = Column(String)
+    plural_form = Column(String)
+    example_sentence_de = Column(Text)
+    example_sentence_en = Column(Text)
+    mnemonic = Column(Text)
+    gender_tip = Column(Text)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "level": self.level,
+            "lesson": self.lesson,
+            "lesson_number": self.lesson_number,
+            "german_word": self.german_word,
+            "english_translation": self.english_translation,
+            "word_class": self.word_class,
+            "gender": self.gender,
+            "plural_form": self.plural_form,
+            "example_sentence_de": self.example_sentence_de,
+            "example_sentence_en": self.example_sentence_en,
+            "mnemonic": self.mnemonic,
+            "gender_tip": self.gender_tip,
         }

@@ -1,11 +1,16 @@
 import { useEffect, useState } from 'react'
-import { getAllFlashcards, deleteFlashcard } from '../services/api'
+import { Link } from 'react-router-dom'
+import { getAllFlashcards, deleteFlashcard, getLibraryLevels } from '../services/api'
 
 function Home() {
   const [flashcards, setFlashcards] = useState([])
   const [loading, setLoading] = useState(true)
+  const [libraryLevels, setLibraryLevels] = useState([])
 
-  useEffect(() => { fetchFlashcards() }, [])
+  useEffect(() => {
+    fetchFlashcards()
+    getLibraryLevels().then(r => setLibraryLevels(r.data)).catch(() => {})
+  }, [])
 
   const fetchFlashcards = async () => {
     try {
@@ -37,8 +42,36 @@ function Home() {
     </div>
   )
 
+  const activeLibraryLevels = libraryLevels.filter(l => !l.locked && l.total_words > 0)
+
   return (
     <div>
+      {/* Library progress widget */}
+      {activeLibraryLevels.length > 0 && (
+        <div className="border dark:border-gray-700 rounded-xl p-4 mb-6 shadow-sm dark:bg-gray-800">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-semibold text-gray-800 dark:text-gray-100">Vocabulary Library</h3>
+            <Link to="/library" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+              Browse &rarr;
+            </Link>
+          </div>
+          {activeLibraryLevels.map(l => {
+            const pct = l.total_words > 0 ? Math.round((l.activated_words / l.total_words) * 100) : 0
+            return (
+              <div key={l.level} className="mb-2 last:mb-0">
+                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                  <span>{l.level} — {l.label}</span>
+                  <span>{l.activated_words} / {l.total_words} words</span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
+                  <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       <h2 className="text-2xl font-bold mb-6 dark:text-white">
         Your Flashcards ({flashcards.length})
       </h2>

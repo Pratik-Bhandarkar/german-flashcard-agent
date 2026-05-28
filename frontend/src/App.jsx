@@ -8,6 +8,8 @@ import Home from './pages/Home'
 import Study from './pages/Study'
 import Add from './pages/Add'
 import Translate from './pages/Translate'
+import Library from './pages/Library'
+import LibraryLevel from './pages/LibraryLevel'
 import Navbar from './components/Navbar'
 
 function App() {
@@ -23,6 +25,8 @@ function App() {
           <Route path="/study" element={<Study />} />
           <Route path="/add" element={<Add />} />
           <Route path="/translate" element={<Translate />} />
+          <Route path="/library" element={<Library />} />
+          <Route path="/library/:level" element={<LibraryLevel />} />
         </Routes>
       </main>
     </BrowserRouter>
