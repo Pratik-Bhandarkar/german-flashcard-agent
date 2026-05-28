@@ -5,8 +5,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.database.db import init_db
-from backend.routes import flashcards
+from backend.database.db import SessionLocal, init_db, migrate_db
+from backend.database.seed_loader import load_seeds
+from backend.routes import flashcards, library
 
 # Initialise the FastAPI app
 app = FastAPI(
@@ -25,11 +26,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create database tables on startup if they don't exist
+# Create tables, run column migrations, then load seed vocabulary
 init_db()
+migrate_db()
+_db = SessionLocal()
+try:
+    load_seeds(_db)
+finally:
+    _db.close()
 
-# Register the flashcards router — all /flashcards routes live there
 app.include_router(flashcards.router)
+app.include_router(library.router)
 
 
 @app.get("/health")

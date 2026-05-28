@@ -18,6 +18,7 @@ function Navbar() {
           <Link to="/study" className="hover:text-blue-200 dark:hover:text-gray-300">Study</Link>
           <Link to="/add" className="hover:text-blue-200 dark:hover:text-gray-300">Add Vocab</Link>
           <Link to="/translate" className="hover:text-blue-200 dark:hover:text-gray-300">Translate</Link>
+          <Link to="/library" className="hover:text-blue-200 dark:hover:text-gray-300">Library</Link>
           <button
             onClick={() => setIsDark(!isDark)}
             className="text-lg hover:opacity-80 transition-opacity"

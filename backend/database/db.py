@@ -3,7 +3,7 @@
 # All database operations go through the session provided here.
 # This is the single place where the database connection is configured.
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from backend.database.models import Base
@@ -34,6 +34,18 @@ def init_db() -> None:
     Call this once when the application starts.
     """
     Base.metadata.create_all(bind=engine)
+
+
+def migrate_db() -> None:
+    """Add columns that did not exist in earlier versions of the schema."""
+    with engine.connect() as conn:
+        existing = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(flashcards)"))
+        }
+        if "seeded_from" not in existing:
+            conn.execute(text("ALTER TABLE flashcards ADD COLUMN seeded_from TEXT"))
+            conn.commit()
 
 
 def get_db():

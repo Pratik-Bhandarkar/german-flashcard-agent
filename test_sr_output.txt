@@ -1,0 +1,108 @@
+
+============================================================
+  PREFLIGHT
+============================================================
+  [[92mPASS[0m] Server running
+
+============================================================
+  1. REVIEW FILTER — which cards appear in /review
+============================================================
+  [[94mINFO[0m] Today is 2026-05-28
+  [[92mPASS[0m] next_review = null      → in queue (never studied)
+  [[92mPASS[0m] next_review = today     → in queue (due today)
+  [[92mPASS[0m] next_review = yesterday → in queue (overdue -1d)
+  [[92mPASS[0m] next_review = -7 days   → in queue (overdue -7d)
+  [[92mPASS[0m] next_review = +1 day    → NOT in queue
+  [[92mPASS[0m] next_review = +7 days   → NOT in queue
+
+============================================================
+  2. DIFFICULTY SCHEDULING — PUT stores correct next_review
+============================================================
+  [[92mPASS[0m] difficulty='easy' → next_review = today+7d stored correctly
+         expected '2026-06-04'  got '2026-06-04'
+  [[92mPASS[0m] difficulty='medium' → next_review = today+3d stored correctly
+         expected '2026-05-31'  got '2026-05-31'
+  [[92mPASS[0m] difficulty='hard' → next_review = today+1d stored correctly
+         expected '2026-05-29'  got '2026-05-29'
+
+============================================================
+  3. CARD LEAVES REVIEW QUEUE AFTER RATING
+============================================================
+  [[92mPASS[0m] card starts in queue (next_review=today)
+  [[92mPASS[0m] card rated 'easy' (next_review=+7d) → no longer in queue
+         PUT status=200
+  [[92mPASS[0m] overdue card starts in queue
+  [[92mPASS[0m] card rated 'hard' (next_review=tomorrow) → no longer in queue
+
+============================================================
+  4. CARD REAPPEARS — simulate date passing by backdating
+============================================================
+  [[92mPASS[0m] card with next_review=+7d is NOT in queue
+  [[92mPASS[0m] same card after backdating → reappears in queue
+
+============================================================
+  5. DIFFICULTY VALIDATION — enum enforced by API
+============================================================
+  [[92mPASS[0m] difficulty='EASY' → 422
+         status=422
+  [[92mPASS[0m] difficulty='veryhard' → 422
+         status=422
+  [[92mPASS[0m] difficulty='1' → 422
+         status=422
+  [[92mPASS[0m] difficulty='null' → 422
+         status=422
+  [[92mPASS[0m] difficulty='yes' → 422
+         status=422
+  [[92mPASS[0m] difficulty='easy' → 200
+         status=200
+  [[92mPASS[0m] difficulty='medium' → 200
+         status=200
+  [[92mPASS[0m] difficulty='hard' → 200
+         status=200
+
+============================================================
+  6. NEXT_REVIEW VALIDATION — ISO date enforced
+============================================================
+  [[92mPASS[0m] next_review='not-a-date' → 422
+         status=422
+  [[92mPASS[0m] next_review='28-05-2026' → 422
+         status=422
+  [[92mPASS[0m] next_review='2026/05/28' → 422
+         status=422
+  [[92mPASS[0m] next_review='tomorrow' → 422
+         status=422
+  [[92mPASS[0m] next_review='0' → 422
+         status=422
+  [[92mPASS[0m] next_review='2026-13-01' → 422
+         status=422
+  [[92mPASS[0m] next_review='2026-05-31' (valid ISO) → 200
+
+============================================================
+  7. TIMEZONE BUG — Study.jsx getNextReviewDate
+============================================================
+  [[94mINFO[0m] Local UTC offset: UTC+2.0h
+  [[91mBUG [0m] Latent timezone bug in Study.jsx:8 (UTC+2.0h, harmless right now)
+         After 22:00 local time, toISOString() gives yesterday's date. Fix: use local date arithmetic instead of toISOString().
+
+============================================================
+  8. STUDY-AGAIN FLOW — reviewed cards keep their schedule
+============================================================
+  [[92mPASS[0m] Re-rating a card updates difficulty and next_review cleanly
+         difficulty='easy'  next_review='2026-06-04'
+
+============================================================
+  CLEANUP
+============================================================
+  [[94mINFO[0m] Deleted 5/13 test cards
+
+============================================================
+  SUMMARY
+============================================================
+  Total : 33
+  [92mPASS[0m  : 32
+  [91mFAIL[0m  : 0  <- unexpected
+  [91mBUG [0m  : 1  <- needs fixing
+
+  Issues:
+    [BUG] Latent timezone bug in Study.jsx:8 (UTC+2.0h, harmless right now)
+           After 22:00 local time, toISOString() gives yesterday's date. Fix: use local date arithmetic instead of toISOString().

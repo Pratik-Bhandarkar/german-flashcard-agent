@@ -48,3 +48,23 @@ export const translateText = (text) =>
 // Run pipeline on German text and return new flashcards
 export const processTranslation = (text, tags) =>
   api.post('/flashcards/process/translation', { text, tags })
+
+// Library — all levels with progress stats
+export const getLibraryLevels = () =>
+  api.get('/library/levels')
+
+// Library — all words for a level, with activated flag
+export const getLibraryWords = (level, { lesson, word_class } = {}) => {
+  const params = {}
+  if (lesson !== undefined) params.lesson = lesson
+  if (word_class !== undefined) params.word_class = word_class
+  return api.get(`/library/${level}/words`, { params })
+}
+
+// Library — add a single word to the user's deck
+export const activateWord = (level, wordId) =>
+  api.post(`/library/${level}/${wordId}/activate`)
+
+// Library — add all words in a lesson to the user's deck
+export const activateLesson = (level, lessonNumber) =>
+  api.post(`/library/${level}/activate-lesson`, { lesson_number: lessonNumber })

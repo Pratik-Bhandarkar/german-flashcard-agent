@@ -12,9 +12,20 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Frontend build output
+frontend/dist/
+frontend/.env*
+
 # VS Code settings
 .vscode/
 
 # OS junk
 .DS_Store
 Thumbs.db
+
+# PDF source files (binary, not source code)
+*.pdf
+
+# Local test inputs
+test_inputs/
+create_test_pdf.py
