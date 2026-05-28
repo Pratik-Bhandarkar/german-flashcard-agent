@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getFlashcardStats, getLibraryLevels, getWordsOfDay, activateWord } from '../services/api'
+import { speak } from '../utils/speech'
 
 const WC_COLORS = {
   noun: 'text-blue-400',
@@ -48,7 +49,16 @@ function WordCard({ word, onAdd }) {
               <p className="text-gray-500 text-xs mt-0.5">({word.plural_form})</p>
             )}
           </div>
-          <p className="text-gray-500 text-xs text-center mt-3">tap to reveal</p>
+          <div className="flex items-center justify-center gap-3 mt-3">
+            <p className="text-gray-500 text-xs">tap to reveal</p>
+            <button
+              onClick={(e) => { e.stopPropagation(); speak(word.german_word) }}
+              className="text-gray-500 hover:text-blue-400 transition-colors text-base leading-none"
+              title="Pronounce"
+            >
+              🔊
+            </button>
+          </div>
         </div>
 
         {/* Back */}
