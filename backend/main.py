@@ -11,7 +11,7 @@ from backend.routes import flashcards, library
 
 # Initialise the FastAPI app
 app = FastAPI(
-    title="German Flashcard Agent API",
+    title="Wortblitz API",
     description="API for generating and studying German flashcards",
     version="1.0.0"
 )

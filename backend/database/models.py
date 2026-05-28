@@ -55,6 +55,9 @@ class Flashcard(Base):
     # Set when this card was imported from the vocabulary library
     seeded_from = Column(String)
 
+    # ISO date of last review (set automatically when difficulty is updated)
+    last_reviewed = Column(String)
+
     def to_dict(self) -> dict:
         """
         Converts the SQLAlchemy model instance to a plain dictionary.
@@ -77,6 +80,7 @@ class Flashcard(Base):
             "next_review": self.next_review,
             "created_at": self.created_at,
             "seeded_from": self.seeded_from,
+            "last_reviewed": self.last_reviewed,
         }
 
 

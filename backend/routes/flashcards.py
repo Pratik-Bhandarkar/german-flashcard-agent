@@ -4,13 +4,13 @@
 
 import shutil
 import uuid
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from backend.database.db import get_db
@@ -86,6 +86,27 @@ def get_all_flashcards(db: Session = Depends(get_db)):
         Flashcard.created_at.desc()
     ).all()
     return [card.to_dict() for card in flashcards]
+
+
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db)):
+    today = date.today().isoformat()
+    due_today = db.query(func.count(Flashcard.id)).filter(
+        or_(Flashcard.next_review == None, Flashcard.next_review <= today)
+    ).scalar() or 0
+    total = db.query(func.count(Flashcard.id)).scalar() or 0
+
+    reviewed_dates = {
+        row[0] for row in
+        db.query(Flashcard.last_reviewed).filter(Flashcard.last_reviewed.isnot(None)).all()
+    }
+    streak = 0
+    check = date.today()
+    while check.isoformat() in reviewed_dates:
+        streak += 1
+        check -= timedelta(days=1)
+
+    return {"due_today": due_today, "total": total, "streak": streak}
 
 
 @router.get("/review")
@@ -263,6 +284,7 @@ def update_flashcard(
     # Only update fields that were actually provided in the request
     if request.difficulty is not None:
         card.difficulty = request.difficulty
+        card.last_reviewed = date.today().isoformat()
     if request.next_review is not None:
         card.next_review = request.next_review
     if request.german_word is not None:

@@ -46,6 +46,9 @@ def migrate_db() -> None:
         if "seeded_from" not in existing:
             conn.execute(text("ALTER TABLE flashcards ADD COLUMN seeded_from TEXT"))
             conn.commit()
+        if "last_reviewed" not in existing:
+            conn.execute(text("ALTER TABLE flashcards ADD COLUMN last_reviewed TEXT"))
+            conn.commit()
 
 
 def get_db():
