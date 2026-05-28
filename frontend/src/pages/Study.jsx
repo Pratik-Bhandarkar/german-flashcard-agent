@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getReviewCards, getAllFlashcards, updateFlashcard } from '../services/api'
+import { speak } from '../utils/speech'
 
 const WC_COLORS = {
   noun: 'text-blue-400 bg-blue-900/30',
@@ -171,6 +172,13 @@ function Study() {
             {card.plural_form && (
               <p className="text-gray-500 mt-2 text-sm">({card.plural_form})</p>
             )}
+            <button
+              onClick={(e) => { e.stopPropagation(); speak(card.german_word) }}
+              className="mt-4 text-gray-500 hover:text-blue-400 transition-colors text-xl"
+              title="Pronounce"
+            >
+              🔊
+            </button>
             {card.gender_tip && (
               <div className="bg-blue-900/30 border border-blue-800/40 rounded-lg px-3 py-2 mt-4 text-xs text-blue-400">
                 🔵 {card.gender_tip}
