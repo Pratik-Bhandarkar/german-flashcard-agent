@@ -68,3 +68,15 @@ export const activateWord = (level, wordId) =>
 // Library — add all words in a lesson to the user's deck
 export const activateLesson = (level, lessonNumber) =>
   api.post(`/library/${level}/activate-lesson`, { lesson_number: lessonNumber })
+
+// Library — bulk add selected words to the user's deck
+export const activateBulk = (level, wordIds) =>
+  api.post(`/library/${level}/activate-bulk`, { word_ids: wordIds })
+
+// Library — 3 daily words (rotates each day, unactivated first)
+export const getWordsOfDay = () =>
+  api.get('/library/words-of-day')
+
+// Flashcard stats: due today, total, streak
+export const getFlashcardStats = () =>
+  api.get('/flashcards/stats')

@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from datetime import date
 
@@ -23,6 +24,35 @@ _CEFR_LEVELS = [
 
 class ActivateLessonRequest(BaseModel):
     lesson_number: int
+
+
+class BulkActivateRequest(BaseModel):
+    word_ids: list[str]
+
+
+@router.get("/words-of-day")
+def get_words_of_day(db: Session = Depends(get_db)):
+    activated_ids = {
+        row[0] for row in
+        db.query(Flashcard.seeded_from).filter(Flashcard.seeded_from.isnot(None)).all()
+    }
+    all_words = db.query(SeedWord).filter(SeedWord.level == "B1").all()
+    pool = sorted([w for w in all_words if w.id not in activated_ids], key=lambda w: w.id)
+    if not pool:
+        pool = sorted(all_words, key=lambda w: w.id)
+    if len(pool) <= 3:
+        return [w.to_dict() for w in pool]
+
+    day_hash = int(hashlib.md5(date.today().isoformat().encode()).hexdigest(), 16)
+    n = len(pool)
+    selected, seen, i = [], set(), 0
+    while len(selected) < 3:
+        idx = (day_hash + i * 1_000_003) % n
+        if idx not in seen:
+            seen.add(idx)
+            selected.append(pool[idx])
+        i += 1
+    return [w.to_dict() for w in selected]
 
 
 @router.get("/levels")
@@ -173,3 +203,49 @@ def activate_lesson(level: str, body: ActivateLessonRequest, db: Session = Depen
 
     db.commit()
     return {"added": added, "linked": linked, "skipped": len(seeds) - added - linked}
+
+
+@router.post("/{level}/activate-bulk")
+def activate_bulk(level: str, body: BulkActivateRequest, db: Session = Depends(get_db)):
+    level_upper = level.upper()
+    activated_ids = {
+        row[0] for row in
+        db.query(Flashcard.seeded_from).filter(Flashcard.seeded_from.isnot(None)).all()
+    }
+    added = linked = skipped = 0
+    for word_id in body.word_ids:
+        if word_id in activated_ids:
+            skipped += 1
+            continue
+        seed = db.query(SeedWord).filter(
+            SeedWord.id == word_id, SeedWord.level == level_upper
+        ).first()
+        if not seed:
+            skipped += 1
+            continue
+        existing = db.query(Flashcard).filter(Flashcard.german_word == seed.german_word).first()
+        if existing:
+            existing.seeded_from = seed.id
+            linked += 1
+        else:
+            db.add(Flashcard(
+                id=str(uuid.uuid4()),
+                german_word=seed.german_word,
+                english_translation=seed.english_translation,
+                word_class=seed.word_class,
+                gender=seed.gender,
+                plural_form=seed.plural_form,
+                example_sentence_de=seed.example_sentence_de,
+                example_sentence_en=seed.example_sentence_en,
+                mnemonic=seed.mnemonic,
+                gender_tip=seed.gender_tip,
+                source=f"{level_upper} library",
+                tags=[level_upper],
+                difficulty=None,
+                next_review=None,
+                created_at=date.today().isoformat(),
+                seeded_from=seed.id,
+            ))
+            added += 1
+    db.commit()
+    return {"added": added, "linked": linked, "skipped": skipped}

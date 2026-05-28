@@ -1,70 +1,195 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getAllFlashcards, deleteFlashcard, getLibraryLevels } from '../services/api'
+import { getFlashcardStats, getLibraryLevels, getWordsOfDay, activateWord } from '../services/api'
 
-function Home() {
-  const [flashcards, setFlashcards] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [libraryLevels, setLibraryLevels] = useState([])
+const WC_COLORS = {
+  noun: 'text-blue-400',
+  verb: 'text-green-400',
+  adjective: 'text-amber-400',
+  adverb: 'text-purple-400',
+}
 
-  useEffect(() => {
-    fetchFlashcards()
-    getLibraryLevels().then(r => setLibraryLevels(r.data)).catch(() => {})
-  }, [])
+function WordCard({ word, onAdd }) {
+  const [flipped, setFlipped] = useState(false)
+  const [added, setAdded] = useState(false)
+  const [adding, setAdding] = useState(false)
 
-  const fetchFlashcards = async () => {
+  const handleAdd = async (e) => {
+    e.stopPropagation()
+    setAdding(true)
     try {
-      const response = await getAllFlashcards()
-      setFlashcards(response.data)
-    } catch (error) {
-      console.error('Failed to fetch flashcards:', error)
+      await onAdd(word)
+      setAdded(true)
+    } catch (err) {
+      if (err.response?.status === 409) setAdded(true)
     } finally {
-      setLoading(false)
+      setAdding(false)
     }
   }
-
-  const handleDelete = async (id) => {
-    try {
-      await deleteFlashcard(id)
-      setFlashcards(prev => prev.filter(card => card.id !== id))
-    } catch (error) {
-      console.error('Failed to delete flashcard:', error)
-    }
-  }
-
-  if (loading) return (
-    <div className="text-center text-gray-500 dark:text-gray-400 mt-20">Loading flashcards...</div>
-  )
-
-  if (flashcards.length === 0) return (
-    <div className="text-center text-gray-500 dark:text-gray-400 mt-20">
-      No flashcards yet. Go to Add Vocab to create some!
-    </div>
-  )
-
-  const activeLibraryLevels = libraryLevels.filter(l => !l.locked && l.total_words > 0)
 
   return (
-    <div>
-      {/* Library progress widget */}
+    <div className="wotd-container" onClick={() => setFlipped(f => !f)}>
+      <div className={`wotd-inner ${flipped ? 'is-flipped' : ''}`}>
+        {/* Front */}
+        <div className="wotd-face rounded-xl border dark:border-gray-700 dark:bg-gray-800/80
+                        bg-white flex flex-col justify-between p-4 shadow-sm
+                        hover:border-blue-500/50 transition-colors">
+          <div>
+            {word.word_class && (
+              <span className={`text-xs uppercase tracking-wider font-semibold ${WC_COLORS[word.word_class] || 'text-gray-400'}`}>
+                {word.word_class}
+              </span>
+            )}
+            <h3 className="text-lg font-bold text-blue-400 mt-1 leading-tight">
+              {word.gender && <span className="text-gray-400 font-normal text-sm">{word.gender} </span>}
+              {word.german_word}
+            </h3>
+            {word.plural_form && (
+              <p className="text-gray-500 text-xs mt-0.5">({word.plural_form})</p>
+            )}
+          </div>
+          <p className="text-gray-500 text-xs text-center mt-3">tap to reveal</p>
+        </div>
+
+        {/* Back */}
+        <div className="wotd-face wotd-back rounded-xl border dark:border-gray-700 dark:bg-gray-800/80
+                        bg-white flex flex-col justify-between p-4 shadow-sm">
+          <div>
+            <p className="text-base font-bold text-green-400">{word.english_translation}</p>
+            <p className="text-gray-400 text-xs italic mt-2 leading-relaxed line-clamp-2">
+              {word.example_sentence_de}
+            </p>
+            {word.mnemonic && (
+              <p className="text-yellow-500/80 text-xs mt-2 line-clamp-1">💡 {word.mnemonic}</p>
+            )}
+          </div>
+          <button
+            onClick={handleAdd}
+            disabled={added || adding}
+            className={`mt-3 text-xs font-medium px-3 py-1.5 rounded-lg transition-all
+              ${added
+                ? 'bg-green-900/30 text-green-400 cursor-default'
+                : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 active:scale-95'
+              }`}
+          >
+            {added ? '✓ Added to deck' : adding ? '…' : '+ Add to deck'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatBox({ value, label, color }) {
+  return (
+    <div className="bg-gray-800/60 rounded-xl p-4 text-center">
+      <div className={`text-3xl font-bold ${color}`}>{value ?? '—'}</div>
+      <div className="text-xs text-gray-400 mt-1">{label}</div>
+    </div>
+  )
+}
+
+function Home() {
+  const [stats, setStats] = useState(null)
+  const [libraryLevels, setLibraryLevels] = useState([])
+  const [wordsOfDay, setWordsOfDay] = useState([])
+
+  useEffect(() => {
+    getFlashcardStats().then(r => setStats(r.data)).catch(() => {})
+    getLibraryLevels().then(r => setLibraryLevels(r.data)).catch(() => {})
+    getWordsOfDay().then(r => setWordsOfDay(r.data)).catch(() => {})
+  }, [])
+
+  const handleAddWord = (word) => activateWord('b1', word.id)
+  const activeLibraryLevels = libraryLevels.filter(l => !l.locked && l.total_words > 0)
+  const hasDue = stats && stats.due_today > 0
+
+  return (
+    <div className="space-y-8">
+
+      {/* Hero */}
+      <div className="rounded-2xl bg-gradient-to-br from-blue-900/50 via-gray-800/60 to-gray-900/80
+                      border dark:border-gray-700/60 p-6 md:p-8">
+        <h2 className="text-3xl font-bold text-white mb-1">Guten Tag! 👋</h2>
+        <p className="text-gray-400 text-sm">Your German vocabulary coach is ready.</p>
+
+        <div className="grid grid-cols-3 gap-3 mt-6">
+          <StatBox
+            value={stats ? `${stats.streak}🔥` : null}
+            label="Day streak"
+            color="text-orange-400"
+          />
+          <StatBox
+            value={stats?.due_today}
+            label="Due today"
+            color="text-blue-400"
+          />
+          <StatBox
+            value={stats?.total}
+            label="Total cards"
+            color="text-green-400"
+          />
+        </div>
+
+        <div className="flex gap-3 mt-5 flex-wrap">
+          <Link
+            to="/study"
+            className={`px-5 py-2.5 rounded-xl font-medium transition-all active:scale-95
+              ${hasDue
+                ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+              }`}
+          >
+            {hasDue ? `Study Now (${stats.due_today})` : 'Practice Anyway'}
+          </Link>
+          <Link to="/library"
+            className="bg-gray-700/60 hover:bg-gray-700 text-gray-200 px-5 py-2.5 rounded-xl
+                       font-medium transition-all border dark:border-gray-600 active:scale-95">
+            Browse Library
+          </Link>
+          <Link to="/add"
+            className="bg-gray-700/60 hover:bg-gray-700 text-gray-200 px-5 py-2.5 rounded-xl
+                       font-medium transition-all border dark:border-gray-600 active:scale-95">
+            + Add Vocab
+          </Link>
+        </div>
+      </div>
+
+      {/* Words of the Day */}
+      {wordsOfDay.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-100">Words of the Day</h3>
+            <span className="text-xs text-gray-500">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {wordsOfDay.map(word => (
+              <WordCard key={word.id} word={word} onAdd={handleAddWord} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Library progress */}
       {activeLibraryLevels.length > 0 && (
-        <div className="border dark:border-gray-700 rounded-xl p-4 mb-6 shadow-sm dark:bg-gray-800">
+        <div className="border dark:border-gray-700 rounded-xl p-4 dark:bg-gray-800/40">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-100">Vocabulary Library</h3>
-            <Link to="/library" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
-              Browse &rarr;
-            </Link>
+            <h3 className="font-semibold text-gray-100">Vocabulary Library</h3>
+            <Link to="/library" className="text-sm text-blue-400 hover:underline">Browse →</Link>
           </div>
           {activeLibraryLevels.map(l => {
             const pct = l.total_words > 0 ? Math.round((l.activated_words / l.total_words) * 100) : 0
             return (
               <div key={l.level} className="mb-2 last:mb-0">
-                <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
                   <span>{l.level} — {l.label}</span>
                   <span>{l.activated_words} / {l.total_words} words</span>
                 </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
-                  <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                <div className="w-full bg-gray-700 rounded-full h-1.5">
+                  <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
+                       style={{ width: `${pct}%` }} />
                 </div>
               </div>
             )
@@ -72,67 +197,6 @@ function Home() {
         </div>
       )}
 
-      <h2 className="text-2xl font-bold mb-6 dark:text-white">
-        Your Flashcards ({flashcards.length})
-      </h2>
-
-      <div className="grid grid-cols-1 gap-4">
-        {flashcards.map(card => (
-          <div
-            key={card.id}
-            className="border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow
-                       dark:border-gray-700 dark:bg-gray-800"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                {card.word_class && (
-                  <span className="text-xs uppercase tracking-widest text-gray-400 dark:text-gray-500 block mb-0.5">
-                    {card.word_class}
-                  </span>
-                )}
-                <span className="text-lg font-bold text-blue-700 dark:text-blue-400">
-                  {card.gender && `${card.gender} `}{card.german_word}
-                </span>
-                {card.plural_form && (
-                  <span className="text-gray-400 dark:text-gray-500 text-sm ml-2">
-                    ({card.plural_form})
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => handleDelete(card.id)}
-                className="text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-400 text-sm"
-              >
-                Delete
-              </button>
-            </div>
-
-            <p className="text-gray-700 dark:text-gray-300 mt-1">{card.english_translation}</p>
-
-            {card.gender_tip && (
-              <p className="text-blue-500 dark:text-blue-400 text-xs mt-2">🔵 {card.gender_tip}</p>
-            )}
-
-            <p className="text-gray-500 dark:text-gray-400 text-sm mt-2 italic">
-              {card.example_sentence_de}
-            </p>
-
-            {card.tags && card.tags.length > 0 && (
-              <div className="flex gap-2 mt-3 flex-wrap">
-                {card.tags.map(tag => (
-                  <span
-                    key={tag}
-                    className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400
-                               text-xs px-2 py-1 rounded-full"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
