@@ -40,7 +40,7 @@ function WordCard({ word, onAdd }) {
                 {word.word_class}
               </span>
             )}
-            <h3 className="text-lg font-bold text-blue-400 mt-1 leading-tight">
+            <h3 className="text-xl font-bold text-blue-400 mt-1 leading-tight">
               {word.gender && <span className="text-gray-400 font-normal text-sm">{word.gender} </span>}
               {word.german_word}
             </h3>
@@ -55,12 +55,18 @@ function WordCard({ word, onAdd }) {
         <div className="wotd-face wotd-back rounded-xl border dark:border-gray-700 dark:bg-gray-800/80
                         bg-white flex flex-col justify-between p-4 shadow-sm">
           <div>
-            <p className="text-base font-bold text-green-400">{word.english_translation}</p>
-            <p className="text-gray-400 text-xs italic mt-2 leading-relaxed line-clamp-2">
+            <p className="text-xs text-gray-500 mb-1 font-medium">{word.german_word}</p>
+            <p className="text-lg font-bold text-green-400 leading-tight">{word.english_translation}</p>
+            <p className="text-gray-400 text-sm italic mt-3 leading-relaxed">
               {word.example_sentence_de}
             </p>
+            {word.example_sentence_en && (
+              <p className="text-gray-500 text-sm mt-1 leading-relaxed">
+                {word.example_sentence_en}
+              </p>
+            )}
             {word.mnemonic && (
-              <p className="text-yellow-500/80 text-xs mt-2 line-clamp-1">💡 {word.mnemonic}</p>
+              <p className="text-yellow-500/80 text-sm mt-2">💡 {word.mnemonic}</p>
             )}
           </div>
           <button

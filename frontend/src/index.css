@@ -44,7 +44,7 @@ body {
   position: relative;
   transform-style: preserve-3d;
   transition: transform 0.45s ease;
-  min-height: 180px;
+  min-height: 260px;
 }
 
 .wotd-inner.is-flipped {
