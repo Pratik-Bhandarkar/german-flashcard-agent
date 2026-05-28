@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"d:\\\\Personal\\\\Projects\\\\german-flashcard-agent\"; $env:PYTHONIOENCODING=\"utf-8\"; $output = & \".\\\\venv\\\\Scripts\\\\python.exe\" test_spaced_repetition.py 2>&1; $output -join \"`n\")",
+      "PowerShell(cd \"d:\\\\Personal\\\\Projects\\\\german-flashcard-agent\"; $env:PYTHONIOENCODING=\"utf-8\"; & \".\\\\venv\\\\Scripts\\\\python.exe\" test_spaced_repetition.py > \"test_sr_output.txt\" 2>&1; Get-Content \"test_sr_output.txt\")",
+      "Bash(PYTHONIOENCODING=utf-8 ./venv/Scripts/python.exe test_spaced_repetition.py)"
+    ]
+  }
+}
