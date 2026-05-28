@@ -28,7 +28,7 @@ def extract_from_text(raw_text: str) -> list[str]:
     # Remove empty strings that appear after splitting
     words = [word for word in words if word]
 
-    return words
+    return clean_word_list(words)
 
 
 def extract_from_image(image_path: str) -> list[str]:
@@ -41,9 +41,7 @@ def extract_from_image(image_path: str) -> list[str]:
     # lang="deu" tells Tesseract to expect German text
     # This improves accuracy for German characters like ä, ö, ü, ß
     raw_text = pytesseract.image_to_string(image, lang="deu")
-    words = extract_from_text(raw_text)
-    # Reuse our text extractor to clean and split the OCR output
-    return clean_word_list(words)
+    return extract_from_text(raw_text)
 
 
 def extract_from_pdf(pdf_path: str) -> list[str]:
@@ -61,8 +59,7 @@ def extract_from_pdf(pdf_path: str) -> list[str]:
 
     pdf_document.close()
     
-    words = extract_from_text(all_text)
-    return clean_word_list(words)
+    return extract_from_text(all_text)
 
 
 def run(input_type: str, input_data: str) -> list[str]:
@@ -108,9 +105,14 @@ def clean_word_list(words: list[str]) -> list[str]:
     ARTICLES = {"der", "die", "das", "ein", "eine"}
 
     FILLER_WORDS = {
-        "er", "sie", "hat", "ist", "sein", "haben",
+        # pronouns
+        "er", "sie", "wir", "ihr", "ihn", "ihm", "man",
+        # verb forms
+        "hat", "ist", "war", "sein", "haben",
+        # prepositions / conjunctions (3-letter ones now reachable after threshold fix)
         "nicht", "zum", "zur", "vom", "beim", "im",
-        "an", "zu", "um", "auf", "aus", "mit"
+        "an", "zu", "um", "auf", "aus", "mit",
+        "und", "als", "bei", "von", "den", "des", "dem", "fur",
     }
 
     cleaned = []
@@ -122,7 +124,7 @@ def clean_word_list(words: list[str]) -> list[str]:
 
         if not stripped:
             continue
-        if len(stripped) <= 3:
+        if len(stripped) < 3:  # reject 1-2 char tokens only; keep 3-letter words like gut/Tag/Weg
             continue
         if stripped.isupper():
             continue
@@ -130,14 +132,13 @@ def clean_word_list(words: list[str]) -> list[str]:
             continue
         if stripped.lower() in FILLER_WORDS:
             continue
-        if stripped.isnumeric():
-            continue
-
         # Skip if we have already added this word
         if stripped.lower() in seen:
             continue
 
         seen.add(stripped.lower())
-        cleaned.append(stripped)
+        # Capitalize first letter — German nouns are always capitalized,
+        # and the LLM handles other word classes correctly regardless of case
+        cleaned.append(stripped[0].upper() + stripped[1:])
 
     return cleaned

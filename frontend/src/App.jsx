@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
 import Study from './pages/Study'
 import Add from './pages/Add'
+import Translate from './pages/Translate'
 import Navbar from './components/Navbar'
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/study" element={<Study />} />
           <Route path="/add" element={<Add />} />
+          <Route path="/translate" element={<Translate />} />
         </Routes>
       </main>
     </BrowserRouter>

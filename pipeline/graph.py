@@ -24,6 +24,9 @@ class FlashcardPipelineState(TypedDict):
     source: str            # where the words came from
     tags: list[str]        # labels to apply to all cards in this batch
 
+    # Optional — when set, the LLM uses this sentence to inspire the example
+    context_de: str
+
     # Output fields — filled in by each agent as the pipeline runs
     words: list[str]                # filled by parser agent
     enrichment_result: dict         # filled by enrichment agent
@@ -56,7 +59,8 @@ def enrichment_node(state: FlashcardPipelineState) -> dict:
     enrichment_result = enrichment_agent.run(
         words=state["words"],
         source=state["source"],
-        tags=state["tags"]
+        tags=state["tags"],
+        context_de=state.get("context_de", "")
     )
 
     return {"enrichment_result": enrichment_result}
@@ -109,12 +113,17 @@ def build_pipeline() -> StateGraph:
     return graph.compile()
 
 
+# Build once at module load — avoids recompiling the graph on every request
+_pipeline = build_pipeline()
+
+
 # --- Public Entry Point ---
 def run_pipeline(
     input_type: str,
     input_data: str,
     source: str = "unknown",
-    tags: list[str] = None
+    tags: list[str] = None,
+    context_de: str = ""
 ) -> dict:
     """
     Main entry point for the flashcard generation pipeline.
@@ -132,14 +141,13 @@ def run_pipeline(
     if tags is None:
         tags = []
 
-    pipeline = build_pipeline()
-
     # Define the initial state before the pipeline starts
     initial_state = {
         "input_type": input_type,
         "input_data": input_data,
         "source": source,
         "tags": tags,
+        "context_de": context_de,
         "words": [],
         "enrichment_result": {},
         "validation_result": {},
@@ -153,7 +161,7 @@ def run_pipeline(
     print(f"Tags:       {tags}")
     print("=" * 50)
 
-    final_state = pipeline.invoke(initial_state)
+    final_state = _pipeline.invoke(initial_state)
 
     print("\n" + "=" * 50)
     print("Pipeline Complete!")

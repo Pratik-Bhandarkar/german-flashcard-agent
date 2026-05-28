@@ -9,6 +9,7 @@ const API_BASE_URL = 'http://localhost:8000'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 180000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -39,3 +40,11 @@ export const updateFlashcard = (id, data) =>
 // Delete a flashcard
 export const deleteFlashcard = (id) =>
   api.delete(`/flashcards/${id}`)
+
+// Instantly translate German text via DeepL (no pipeline)
+export const translateText = (text) =>
+  api.post('/flashcards/translate', { text })
+
+// Run pipeline on German text and return new flashcards
+export const processTranslation = (text, tags) =>
+  api.post('/flashcards/process/translation', { text, tags })

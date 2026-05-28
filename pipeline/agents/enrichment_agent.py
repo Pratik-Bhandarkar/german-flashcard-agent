@@ -7,6 +7,59 @@ import uuid
 from datetime import date
 
 from pipeline.tools import deepl_client, llm_client
+from backend.database.db import SessionLocal
+from backend.database.models import Flashcard
+
+
+# Suffix → (expected gender, tip text). Longer suffixes listed first to avoid
+# shorter ones matching prematurely (e.g. -tum before -um).
+_GENDER_SUFFIX_RULES: list[tuple[str, str, str]] = [
+    # Die — very reliable
+    ("ung",    "die", "Words ending in -ung are always feminine"),
+    ("heit",   "die", "Words ending in -heit are always feminine"),
+    ("keit",   "die", "Words ending in -keit are always feminine"),
+    ("schaft", "die", "Words ending in -schaft are always feminine"),
+    ("ität",   "die", "Words ending in -ität are always feminine"),
+    ("ion",    "die", "Words ending in -ion are always feminine"),
+    ("tät",    "die", "Words ending in -tät are always feminine"),
+    ("enz",    "die", "Words ending in -enz are usually feminine"),
+    ("anz",    "die", "Words ending in -anz are usually feminine"),
+    ("ik",     "die", "Words ending in -ik are usually feminine"),
+    ("ie",     "die", "Words ending in -ie are usually feminine"),
+    # Das — very reliable
+    ("chen",   "das", "Diminutives ending in -chen are always neuter"),
+    ("lein",   "das", "Diminutives ending in -lein are always neuter"),
+    ("ment",   "das", "Words ending in -ment are usually neuter"),
+    ("tum",    "das", "Words ending in -tum are usually neuter"),
+    ("um",     "das", "Words ending in -um are usually neuter"),
+    # Der — fairly reliable
+    ("ling",   "der", "Words ending in -ling are masculine"),
+    ("ismus",  "der", "Words ending in -ismus are masculine"),
+    ("ist",    "der", "Words ending in -ist are usually masculine"),
+    ("or",     "der", "Words ending in -or are usually masculine"),
+    ("ig",     "der", "Words ending in -ig are usually masculine"),
+    ("er",     "der", "Many words ending in -er are masculine"),
+]
+
+
+def _get_gender_tip(word: str, gender: str | None) -> str | None:
+    """Returns a suffix-based article tip when the word matches a known pattern."""
+    if not gender:
+        return None
+    word_lower = word.lower()
+    for suffix, expected_gender, tip in _GENDER_SUFFIX_RULES:
+        if word_lower.endswith(suffix) and gender == expected_gender:
+            return tip
+    return None
+
+
+def _get_existing_words() -> set[str]:
+    db = SessionLocal()
+    try:
+        rows = db.query(Flashcard.german_word).all()
+        return {row[0].lower() for row in rows}
+    finally:
+        db.close()
 
 
 def _build_flashcard(
@@ -44,6 +97,7 @@ def _build_flashcard(
         "example_sentence_de": llm_data.get("example_sentence_de"),
         "example_sentence_en": llm_data.get("example_sentence_en"),
         "mnemonic": llm_data.get("mnemonic"),
+        "gender_tip": _get_gender_tip(german_word, llm_data.get("gender")),
 
         # Metadata
         "source": source,
@@ -61,7 +115,8 @@ def _build_flashcard(
 def run(
     words: list[str],
     source: str = "unknown",
-    tags: list[str] = None
+    tags: list[str] = None,
+    context_de: str = ""
 ) -> dict:
     """
     Main entry point for the Enrichment Agent.
@@ -82,8 +137,18 @@ def run(
     if tags is None:
         tags = []
 
+    existing = _get_existing_words()
+    new_words = [w for w in words if w.lower() not in existing]
+    skipped_count = len(words) - len(new_words)
+    if skipped_count:
+        print(f"Skipped {skipped_count} word(s) already in DB — no API calls made")
+    words = new_words
+
     flashcards = []
     failures = []
+
+    if not words:
+        return {"flashcards": [], "failures": []}
 
     # Step 1 — Translate all words in one batch call to save API quota
     print(f"Translating {len(words)} words via DeepL...")
@@ -93,7 +158,7 @@ def run(
     for word, translation in zip(words, translations):
         print(f"Enriching: {word}...")
         try:
-            llm_data = llm_client.enrich_word(word)
+            llm_data = llm_client.enrich_word(word, context_de=context_de)
 
             # LLM flagged this as not a real German word — skip it
             if not llm_data.get("is_valid", True):

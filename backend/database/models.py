@@ -26,7 +26,7 @@ class Flashcard(Base):
     id = Column(String, primary_key=True)
 
     # Core word data
-    german_word = Column(String, nullable=False)
+    german_word = Column(String, nullable=False, unique=True)
     english_translation = Column(String, nullable=False)
     word_class = Column(String)
     gender = Column(String)
@@ -36,6 +36,7 @@ class Flashcard(Base):
     example_sentence_de = Column(Text)
     example_sentence_en = Column(Text)
     mnemonic = Column(Text)
+    gender_tip = Column(Text)
 
     # Metadata
     source = Column(String)
@@ -66,6 +67,7 @@ class Flashcard(Base):
             "example_sentence_de": self.example_sentence_de,
             "example_sentence_en": self.example_sentence_en,
             "mnemonic": self.mnemonic,
+            "gender_tip": self.gender_tip,
             "source": self.source,
             "tags": self.tags or [],
             "difficulty": self.difficulty,

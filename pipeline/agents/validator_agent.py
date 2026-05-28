@@ -3,9 +3,9 @@
 # Checks every flashcard for completeness and correctness before storage.
 # Never modifies flashcard content — only approves or rejects.
 
-from pipeline.config import SUPPORTED_INPUT_TYPES
-
-# Fields that every flashcard must have regardless of word class
+# Fields that every flashcard must have regardless of word class.
+# mnemonic is intentionally excluded — it's optional. The LLM sometimes
+# returns null for proper nouns or common words where no hook is needed.
 REQUIRED_FIELDS = [
     "id",
     "german_word",
@@ -13,14 +13,13 @@ REQUIRED_FIELDS = [
     "word_class",
     "example_sentence_de",
     "example_sentence_en",
-    "mnemonic",
     "created_at"
 ]
 
-# Fields that are required specifically for nouns
+# Gender is required for nouns; plural_form is optional because proper nouns
+# and uncountable nouns have no plural form.
 NOUN_REQUIRED_FIELDS = [
     "gender",
-    "plural_form"
 ]
 
 # The only word classes we accept — anything else is an LLM hallucination
@@ -31,6 +30,9 @@ VALID_WORD_CLASSES = [
     "adverb",
     "other"
 ]
+
+# The only accepted article forms for German nouns
+VALID_GENDERS = {"der", "die", "das"}
 
 
 def _check_required_fields(flashcard: dict) -> list[str]:
@@ -72,7 +74,7 @@ def _check_word_class(flashcard: dict) -> list[str]:
 
 def _check_noun_fields(flashcard: dict) -> list[str]:
     """
-    If the word is a noun, checks that gender and plural_form are present.
+    If the word is a noun, checks that gender is present and a valid article.
     Non-nouns are allowed to have null gender and plural_form.
 
     Returns:
@@ -81,12 +83,14 @@ def _check_noun_fields(flashcard: dict) -> list[str]:
     errors = []
 
     if flashcard.get("word_class") == "noun":
-        for field in NOUN_REQUIRED_FIELDS:
-            value = flashcard.get(field)
-            if not value:
-                errors.append(
-                    f"Noun is missing required field: '{field}'"
-                )
+        gender = flashcard.get("gender")
+        if not gender:
+            errors.append("Noun is missing required field: 'gender'")
+        elif gender not in VALID_GENDERS:
+            errors.append(
+                f"Noun has invalid gender: '{gender}'. "
+                f"Must be one of {sorted(VALID_GENDERS)}"
+            )
 
     return errors
 

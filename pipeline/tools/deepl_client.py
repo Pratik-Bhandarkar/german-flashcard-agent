@@ -7,9 +7,6 @@ import deepl
 
 from pipeline.config import DEEPL_API_KEY, DEEPL_TARGET_LANG
 
-# and in both function calls:
-target_lang=DEEPL_TARGET_LANG
-
 
 # Initialise the DeepL translator once at module level.
 # We do this here so every call reuses the same connection
@@ -17,23 +14,21 @@ target_lang=DEEPL_TARGET_LANG
 translator = deepl.Translator(DEEPL_API_KEY)
 
 
-def translate_to_english(german_word: str) -> str:
+def translate_sentence(text: str) -> str:
     """
-    Translates a single German word or phrase to English.
+    Translates a full German sentence or paragraph to English.
 
     Args:
-        german_word: a German word or short phrase
+        text: German text to translate
 
     Returns:
-        The English translation as a string
+        English translation as a single string
     """
     result = translator.translate_text(
-        german_word,
-        source_lang="DE",   # we know the input is always German
+        text,
+        source_lang="DE",
         target_lang=DEEPL_TARGET_LANG
     )
-
-    # result.text contains the translated string
     return result.text
 
 
@@ -52,7 +47,7 @@ def translate_batch(german_words: list[str]) -> list[str]:
     results = translator.translate_text(
         german_words,
         source_lang="DE",
-        target_lang="EN-GB"
+        target_lang=DEEPL_TARGET_LANG
     )
 
     # Each item in results has a .text attribute with the translation

@@ -5,28 +5,22 @@
 
 from sqlalchemy.orm import Session
 
-from backend.database.db import SessionLocal, init_db
+from backend.database.db import SessionLocal
 from backend.database.models import Flashcard
 
 
-def _save_flashcard(db: Session, flashcard: dict) -> None:
+def _save_flashcard(db: Session, flashcard: dict) -> bool:
     """
     Inserts a single flashcard into the database.
-    Skips silently if a card with the same ID already exists.
-
-    Args:
-        db: active SQLAlchemy session
-        flashcard: validated flashcard dictionary
+    Returns True if saved, False if already exists.
     """
-    # Check if a card with this ID already exists before inserting
-    # This prevents duplicates if the same word list is processed twice
     existing = db.query(Flashcard).filter(
-        Flashcard.id == flashcard["id"]
+        Flashcard.german_word == flashcard["german_word"]
     ).first()
 
     if existing:
         print(f"  Skipped (already exists): {flashcard['german_word']}")
-        return
+        return False
 
     # Create a SQLAlchemy model instance from the dictionary
     db_flashcard = Flashcard(
@@ -39,6 +33,7 @@ def _save_flashcard(db: Session, flashcard: dict) -> None:
         example_sentence_de=flashcard.get("example_sentence_de"),
         example_sentence_en=flashcard.get("example_sentence_en"),
         mnemonic=flashcard.get("mnemonic"),
+        gender_tip=flashcard.get("gender_tip"),
         source=flashcard.get("source"),
         tags=flashcard.get("tags", []),
         difficulty=flashcard.get("difficulty"),
@@ -47,24 +42,7 @@ def _save_flashcard(db: Session, flashcard: dict) -> None:
     )
 
     db.add(db_flashcard)
-
-
-def get_all_flashcards() -> list[dict]:
-    """
-    Retrieves all flashcards from the database ordered by creation date.
-    Used by the FastAPI backend to serve cards to the frontend.
-
-    Returns:
-        List of flashcard dictionaries
-    """
-    db = SessionLocal()
-    try:
-        flashcards = db.query(Flashcard).order_by(
-            Flashcard.created_at.desc()
-        ).all()
-        return [card.to_dict() for card in flashcards]
-    finally:
-        db.close()
+    return True
 
 
 def run(validation_result: dict) -> dict:
@@ -84,18 +62,15 @@ def run(validation_result: dict) -> dict:
     """
     valid_flashcards = validation_result["valid"]
 
-    # Initialise the database — creates tables if they don't exist
-    init_db()
-
     db = SessionLocal()
     saved_count = 0
 
     try:
         for flashcard in valid_flashcards:
             try:
-                _save_flashcard(db, flashcard)
-                saved_count += 1
-                print(f"  Saved: {flashcard['german_word']}")
+                if _save_flashcard(db, flashcard):
+                    saved_count += 1
+                    print(f"  Saved: {flashcard['german_word']}")
             except Exception as e:
                 print(f"  Failed to save '{flashcard['german_word']}': {e}")
 

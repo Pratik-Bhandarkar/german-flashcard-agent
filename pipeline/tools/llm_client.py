@@ -27,7 +27,7 @@ ENRICHMENT_PROMPT_TEMPLATE = """
 You are a German language expert. Given a German word, return a JSON object.
 
 First check if the input is a real, standalone German vocabulary word.
-If it is NOT a real German word, a word fragment, or a conjugated/declined 
+If it is NOT a real German word, a word fragment, or a conjugated/declined
 verb form, return exactly this JSON:
 {{"is_valid": false}}
 
@@ -37,14 +37,14 @@ If it IS a valid German word, return:
     "word_class": one of "noun", "verb", "adjective", "adverb", "other",
     "gender": "der", "die", "das", or null if not a noun,
     "plural_form": the plural form or null if not a noun,
-    "example_sentence_de": a simple natural German sentence using the word,
+    "example_sentence_de": a short, natural German sentence using the word, maximum 6 words,
     "example_sentence_en": English translation of that sentence,
     "mnemonic": a creative memory hook in English to help an English speaker remember the German word
 }}
 
 Return ONLY the JSON object. No explanation, no markdown, no extra text.
 
-German word: {word}
+German word: {word}{context_section}
 """
 
 
@@ -79,7 +79,20 @@ def _parse_llm_response(raw_response: str) -> dict:
         raise ValueError(f"LLM returned malformed JSON: {e}\nRaw response: {cleaned}")
 
 
-def _enrich_with_ollama(word: str) -> dict:
+_CONTEXT_MAX_CHARS = 500
+
+
+def _build_prompt(word: str, context_de: str = "") -> str:
+    safe_context = context_de[:_CONTEXT_MAX_CHARS] if context_de else ""
+    context_section = (
+        f'\nContext: This word appeared in the following sentence — '
+        f'draw inspiration from it for the example: "{safe_context}"'
+        if safe_context else ""
+    )
+    return ENRICHMENT_PROMPT_TEMPLATE.format(word=word, context_section=context_section)
+
+
+def _enrich_with_ollama(word: str, context_de: str = "") -> dict:
     """
     Sends an enrichment request to the local Ollama instance.
 
@@ -89,7 +102,7 @@ def _enrich_with_ollama(word: str) -> dict:
     Returns:
         Dictionary of enrichment data
     """
-    prompt = ENRICHMENT_PROMPT_TEMPLATE.format(word=word)
+    prompt = _build_prompt(word, context_de)
 
     # Ollama exposes a simple HTTP API — we call it directly with requests
     response = requests.post(
@@ -100,14 +113,16 @@ def _enrich_with_ollama(word: str) -> dict:
             # stream=False means we wait for the full response
             # instead of receiving it word by word
             "stream": False
-        }
+        },
+        timeout=120
     )
+    response.raise_for_status()
 
     raw_text = response.json()["response"]
     return _parse_llm_response(raw_text)
 
 
-def _enrich_with_openai(word: str) -> dict:
+def _enrich_with_openai(word: str, context_de: str = "") -> dict:
     """
     Sends an enrichment request to the OpenAI API.
 
@@ -117,7 +132,7 @@ def _enrich_with_openai(word: str) -> dict:
     Returns:
         Dictionary of enrichment data
     """
-    prompt = ENRICHMENT_PROMPT_TEMPLATE.format(word=word)
+    prompt = _build_prompt(word, context_de)
 
     response = openai_client.chat.completions.create(
         model=OPENAI_MODEL,
@@ -132,7 +147,7 @@ def _enrich_with_openai(word: str) -> dict:
     return _parse_llm_response(raw_text)
 
 
-def enrich_word(word: str) -> dict:
+def enrich_word(word: str, context_de: str = "") -> dict:
     """
     Main entry point for the LLM client.
     Routes to Ollama or OpenAI based on the USE_LOCAL_LLM config flag.
@@ -145,6 +160,6 @@ def enrich_word(word: str) -> dict:
         example_sentence_de, example_sentence_en, and mnemonic
     """
     if USE_LOCAL_LLM:
-        return _enrich_with_ollama(word)
+        return _enrich_with_ollama(word, context_de)
     else:
-        return _enrich_with_openai(word)
+        return _enrich_with_openai(word, context_de)
