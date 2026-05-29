@@ -30,6 +30,14 @@ function Study() {
 
   useEffect(() => { fetchCards() }, [])
 
+  // Auto-play pronunciation whenever a new card is shown
+  useEffect(() => {
+    if (cards.length > 0 && !finished) {
+      const card = cards[currentIndex]
+      speak(card.gender ? `${card.gender} ${card.german_word}` : card.german_word)
+    }
+  }, [currentIndex, cards])
+
   const fetchCards = async () => {
     setLoading(true)
     try {
@@ -195,7 +203,7 @@ function Study() {
               <p className="text-gray-500 mt-2 text-sm">({card.plural_form})</p>
             )}
             <button
-              onClick={(e) => { e.stopPropagation(); speak(card.german_word) }}
+              onClick={(e) => { e.stopPropagation(); speak(card.gender ? `${card.gender} ${card.german_word}` : card.german_word) }}
               className="mt-4 text-gray-500 hover:text-blue-400 transition-colors text-xl"
               title="Pronounce"
             >
