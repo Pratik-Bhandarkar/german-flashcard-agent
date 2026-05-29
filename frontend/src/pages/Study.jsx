@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getReviewCards, updateFlashcard } from '../services/api'
-import { speak } from '../utils/speech'
+import { speak, cancelSpeech } from '../utils/speech'
 import { getNextReviewDate } from '../utils/srs'
 
 const WC_COLORS = {
@@ -21,6 +21,9 @@ function Study() {
   const [instantFlip, setInstantFlip] = useState(false)
 
   useEffect(() => { fetchCards() }, [])
+
+  // Cancel any pending speech when leaving the page
+  useEffect(() => () => cancelSpeech(), [])
 
   // Auto-play pronunciation whenever a new card is shown
   useEffect(() => {
