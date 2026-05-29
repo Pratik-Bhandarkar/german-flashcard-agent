@@ -195,7 +195,7 @@ def write_output(by_lesson: dict[int, list[str]], output_path: Path, level: str)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
-    print(f"\n{level} — {total} words across {len(by_lesson)} lessons → {output_path}")
+    print(f"\n{level} - {total} words across {len(by_lesson)} lessons -> {output_path}")
     for ln in sorted(by_lesson):
         topic = topics.get(ln, f"Lesson {ln}")
         unique = len({w.lower() for w in by_lesson[ln]})
