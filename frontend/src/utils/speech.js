@@ -5,7 +5,7 @@ export function speak(text) {
   setTimeout(() => {
     const utt = new SpeechSynthesisUtterance(text)
     utt.lang = 'de-DE'
-    utt.rate = 0.7
+    utt.rate = 0.6
     window.speechSynthesis.speak(utt)
   }, 150)
 }
