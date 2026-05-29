@@ -2,7 +2,6 @@
 # Defines all HTTP endpoints for flashcard operations.
 # Handles fetching, processing, updating and deleting flashcards.
 
-import shutil
 import uuid
 from datetime import date, timedelta
 from pathlib import Path
@@ -22,7 +21,8 @@ router = APIRouter(prefix="/flashcards", tags=["flashcards"])
 
 _TRANSLATOR_SOURCE = "translator"
 
-UPLOAD_FOLDER = Path("data/uploads")
+# Pin upload folder to an absolute path regardless of working directory
+UPLOAD_FOLDER = Path(__file__).resolve().parent.parent.parent / "data" / "uploads"
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -123,7 +123,7 @@ def get_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/review")
-def get_cards_due_for_review(limit: int = 20, db: Session = Depends(get_db)):
+def get_cards_due_for_review(limit: Annotated[int, Field(ge=0, le=500)] = 20, db: Session = Depends(get_db)):
     """
     Returns main deck session: spaced-rep reviews first (most overdue first),
     then new cards to fill remaining slots. Capped at `limit` (0 = no cap).
@@ -262,27 +262,31 @@ async def process_image(
             detail="File type not allowed. Accepted: images (jpg, png, gif, bmp, webp) and PDF."
         )
 
-    # Reject based on Content-Length before writing to disk when possible.
-    # This avoids streaming a huge file all the way before rejecting it.
-    content_length = file.size  # set by Starlette when available
-    if content_length is not None and content_length > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="File too large. Maximum size is 10 MB.")
+    tags_list = [t.strip() for t in tags.split(",") if t.strip()]
+    if len(tags_list) > _TAG_MAX_ITEMS:
+        raise HTTPException(status_code=400, detail=f"Too many tags (max {_TAG_MAX_ITEMS})")
+    for tag in tags_list:
+        if len(tag) > _TAG_MAX_LEN:
+            raise HTTPException(status_code=400, detail=f"Tag too long (max {_TAG_MAX_LEN} chars)")
 
     temp_path = UPLOAD_FOLDER / f"{uuid.uuid4()}{suffix}"
 
     try:
-        with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Stream the upload with a running byte counter — reject mid-stream
+        # if the file exceeds the limit, avoiding a full disk write first.
+        written = 0
+        with open(temp_path, "wb") as f:
+            while chunk := await file.read(65_536):
+                written += len(chunk)
+                if written > MAX_UPLOAD_BYTES:
+                    f.close()
+                    raise HTTPException(status_code=413, detail="File too large. Maximum size is 10 MB.")
+                f.write(chunk)
 
-        actual_size = temp_path.stat().st_size
-        if actual_size == 0:
+        if written == 0:
             raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-        if actual_size > MAX_UPLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="File too large. Maximum size is 10 MB.")
 
         input_type = "pdf" if suffix == ".pdf" else "image"
-
-        tags_list = [t.strip() for t in tags.split(",") if t.strip()]
         try:
             final_state = run_pipeline(
                 input_type=input_type,

@@ -2,12 +2,29 @@
 # Entry point for the FastAPI backend.
 # Initialises the app, registers routes, and sets up the database.
 
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.database.db import SessionLocal, init_db, migrate_db
 from backend.database.seed_loader import load_seeds
 from backend.routes import flashcards, library
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
+_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+    if o.strip()
+]
 
 # Initialise the FastAPI app
 app = FastAPI(
@@ -16,14 +33,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware allows the React frontend to call this API.
-# Without this the browser will block all requests from the frontend.
+app.add_middleware(SecurityHeadersMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # React dev server default port
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type"],
 )
 
 # Create tables, run column migrations, then load seed vocabulary

@@ -24,6 +24,12 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 # --- DeepL Settings ---
 DEEPL_API_KEY = os.getenv("DEEPL_API_KEY", "")
 
+# Validate required keys at startup so misconfiguration fails loudly
+if not USE_LOCAL_LLM and not OPENAI_API_KEY:
+    raise RuntimeError("OPENAI_API_KEY is not set but USE_LOCAL_LLM=false. Check your .env file.")
+if not DEEPL_API_KEY:
+    raise RuntimeError("DEEPL_API_KEY is not set. Check your .env file.")
+
 # --- Database Settings ---
 # SQLite database path — lives in the data/ folder
 DATABASE_PATH = os.getenv("DATABASE_PATH", "data/flashcards.db")

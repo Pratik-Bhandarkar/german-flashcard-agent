@@ -1,9 +1,10 @@
 import hashlib
 import uuid
 from datetime import date
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,8 @@ from backend.database.db import get_db
 from backend.database.models import Flashcard, SeedWord
 
 router = APIRouter(prefix="/library", tags=["library"])
+
+CefrLevel = Literal["A1", "A2", "B1", "B2", "C1", "C2"]
 
 _CEFR_LEVELS = [
     {"level": "A1", "label": "Beginner",           "locked": False},
@@ -27,7 +30,7 @@ class ActivateLessonRequest(BaseModel):
 
 
 class BulkActivateRequest(BaseModel):
-    word_ids: list[str]
+    word_ids: Annotated[list[str], Field(max_length=500)]
 
 
 @router.get("/words-of-day")
@@ -79,7 +82,7 @@ def get_levels(db: Session = Depends(get_db)):
 
 @router.get("/{level}/words")
 def get_words(
-    level: str,
+    level: CefrLevel,
     lesson: int | None = None,
     word_class: str | None = None,
     db: Session = Depends(get_db),
@@ -116,7 +119,7 @@ def get_words(
 
 
 @router.post("/{level}/{word_id}/activate")
-def activate_word(level: str, word_id: str, db: Session = Depends(get_db)):
+def activate_word(level: CefrLevel, word_id: str, db: Session = Depends(get_db)):
     seed = db.query(SeedWord).filter(
         SeedWord.id == word_id,
         SeedWord.level == level.upper(),
@@ -157,7 +160,7 @@ def activate_word(level: str, word_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{level}/activate-lesson")
-def activate_lesson(level: str, body: ActivateLessonRequest, db: Session = Depends(get_db)):
+def activate_lesson(level: CefrLevel, body: ActivateLessonRequest, db: Session = Depends(get_db)):
     seeds = db.query(SeedWord).filter(
         SeedWord.level == level.upper(),
         SeedWord.lesson_number == body.lesson_number,
@@ -207,7 +210,7 @@ def activate_lesson(level: str, body: ActivateLessonRequest, db: Session = Depen
 
 
 @router.post("/{level}/activate-bulk")
-def activate_bulk(level: str, body: BulkActivateRequest, db: Session = Depends(get_db)):
+def activate_bulk(level: CefrLevel, body: BulkActivateRequest, db: Session = Depends(get_db)):
     level_upper = level.upper()
     activated_ids = {
         row[0] for row in
