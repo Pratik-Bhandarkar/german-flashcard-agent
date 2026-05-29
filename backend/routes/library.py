@@ -13,8 +13,8 @@ from backend.database.models import Flashcard, SeedWord
 router = APIRouter(prefix="/library", tags=["library"])
 
 _CEFR_LEVELS = [
-    {"level": "A1", "label": "Beginner",           "locked": True},
-    {"level": "A2", "label": "Elementary",          "locked": True},
+    {"level": "A1", "label": "Beginner",           "locked": False},
+    {"level": "A2", "label": "Elementary",          "locked": False},
     {"level": "B1", "label": "Intermediate",        "locked": False},
     {"level": "B2", "label": "Upper-Intermediate",  "locked": True},
     {"level": "C1", "label": "Advanced",            "locked": True},
