@@ -1,22 +1,13 @@
 import { useEffect, useState } from 'react'
 import { getReviewCards, updateFlashcard } from '../services/api'
 import { speak } from '../utils/speech'
+import { getNextReviewDate } from '../utils/srs'
 
 const WC_COLORS = {
   noun: 'text-blue-400 bg-blue-900/30',
   verb: 'text-green-400 bg-green-900/30',
   adjective: 'text-amber-400 bg-amber-900/30',
   adverb: 'text-purple-400 bg-purple-900/30',
-}
-
-const getNextReviewDate = (difficulty) => {
-  const today = new Date()
-  const days = { easy: 7, medium: 3, hard: 1 }
-  today.setDate(today.getDate() + days[difficulty])
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 function Study() {

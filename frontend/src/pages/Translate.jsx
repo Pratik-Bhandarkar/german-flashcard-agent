@@ -1,22 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { translateText, processTranslation, getTranslationCards, updateFlashcard } from '../services/api'
 import { speak } from '../utils/speech'
+import { getNextReviewDate } from '../utils/srs'
 
 const WC_COLORS = {
   noun: 'text-blue-400',
   verb: 'text-green-400',
   adjective: 'text-amber-400',
   adverb: 'text-purple-400',
-}
-
-const getNextReviewDate = (difficulty) => {
-  const today = new Date()
-  const days = { easy: 7, medium: 3, hard: 1 }
-  today.setDate(today.getDate() + days[difficulty])
-  const year = today.getFullYear()
-  const month = String(today.getMonth() + 1).padStart(2, '0')
-  const day = String(today.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 function TranslationDeck() {

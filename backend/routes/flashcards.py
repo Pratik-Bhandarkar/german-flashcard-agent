@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import or_, func
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.database.db import get_db
@@ -19,6 +19,8 @@ from pipeline.graph import run_pipeline
 from pipeline.tools import deepl_client
 
 router = APIRouter(prefix="/flashcards", tags=["flashcards"])
+
+_TRANSLATOR_SOURCE = "translator"
 
 UPLOAD_FOLDER = Path("data/uploads")
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
@@ -96,13 +98,13 @@ def get_stats(db: Session = Depends(get_db)):
     due_today = db.query(func.count(Flashcard.id)).filter(
         Flashcard.last_reviewed.isnot(None),
         Flashcard.next_review <= today,
-        Flashcard.source != "translator",
+        Flashcard.source != _TRANSLATOR_SOURCE,
     ).scalar() or 0
 
     # Cards never studied yet (new, waiting to be introduced)
     new_cards = db.query(func.count(Flashcard.id)).filter(
         Flashcard.last_reviewed.is_(None),
-        Flashcard.source != "translator",
+        Flashcard.source != _TRANSLATOR_SOURCE,
     ).scalar() or 0
 
     total = db.query(func.count(Flashcard.id)).scalar() or 0
@@ -131,12 +133,12 @@ def get_cards_due_for_review(limit: int = 20, db: Session = Depends(get_db)):
     reviews = db.query(Flashcard).filter(
         Flashcard.last_reviewed.isnot(None),
         Flashcard.next_review <= today,
-        Flashcard.source != "translator",
+        Flashcard.source != _TRANSLATOR_SOURCE,
     ).order_by(Flashcard.next_review.asc()).all()
 
     new_cards = db.query(Flashcard).filter(
         Flashcard.last_reviewed.is_(None),
-        Flashcard.source != "translator",
+        Flashcard.source != _TRANSLATOR_SOURCE,
     ).all()
 
     combined = reviews + new_cards
@@ -150,12 +152,12 @@ def get_translation_cards_due(db: Session = Depends(get_db)):
     """Returns translator deck: spaced-rep reviews first, then new cards."""
     today = date.today().isoformat()
     reviews = db.query(Flashcard).filter(
-        Flashcard.source == "translator",
+        Flashcard.source == _TRANSLATOR_SOURCE,
         Flashcard.last_reviewed.isnot(None),
         Flashcard.next_review <= today,
     ).order_by(Flashcard.next_review.asc()).all()
     new_cards = db.query(Flashcard).filter(
-        Flashcard.source == "translator",
+        Flashcard.source == _TRANSLATOR_SOURCE,
         Flashcard.last_reviewed.is_(None),
     ).all()
     return [c.to_dict() for c in reviews + new_cards]
@@ -318,7 +320,6 @@ def _auto_enroll_next_lesson(card: Flashcard, db: Session) -> dict | None:
 
     level, lesson_num = seed.level, seed.lesson_number
 
-    # IDs of all seed words in this lesson
     lesson_seed_ids = {
         row[0] for row in
         db.query(SeedWord.id).filter(
@@ -327,16 +328,16 @@ def _auto_enroll_next_lesson(card: Flashcard, db: Session) -> dict | None:
         ).all()
     }
 
-    # Cards in the deck that belong to this lesson
     lesson_cards = db.query(Flashcard).filter(
         Flashcard.seeded_from.in_(lesson_seed_ids)
     ).all()
 
-    # Lesson is complete when every activated card has been reviewed at least once
+    # Lesson is complete when every card in the deck for this lesson has been reviewed.
+    # We don't require 100% of seeds — only the ones actually in the deck (session cap
+    # may mean some seeds were never activated yet; those will arrive in future sessions).
     if not lesson_cards or any(c.last_reviewed is None for c in lesson_cards):
         return None
 
-    # Find next lesson's seed words not yet in the deck
     next_lesson_seeds = db.query(SeedWord).filter(
         SeedWord.level == level,
         SeedWord.lesson_number == lesson_num + 1,
@@ -345,20 +346,32 @@ def _auto_enroll_next_lesson(card: Flashcard, db: Session) -> dict | None:
     if not next_lesson_seeds:
         return None
 
-    activated_seed_ids = {
-        row[0] for row in
-        db.query(Flashcard.seeded_from).filter(Flashcard.seeded_from.isnot(None)).all()
-    }
-    existing_words = {row[0] for row in db.query(Flashcard.german_word).all()}
+    # Scope queries to next lesson only — avoid full-table scans on every rating
+    next_seed_ids = {s.id for s in next_lesson_seeds}
+    next_seed_words = {s.german_word for s in next_lesson_seeds}
 
-    added = 0
+    already_activated = {
+        row[0] for row in
+        db.query(Flashcard.seeded_from).filter(
+            Flashcard.seeded_from.in_(next_seed_ids)
+        ).all()
+    }
+    existing_in_deck = {
+        row[0] for row in
+        db.query(Flashcard.german_word).filter(
+            Flashcard.german_word.in_(next_seed_words)
+        ).all()
+    }
+
+    added = linked = 0
     for s in next_lesson_seeds:
-        if s.id in activated_seed_ids:
+        if s.id in already_activated:
             continue
-        if s.german_word in existing_words:
+        if s.german_word in existing_in_deck:
             existing = db.query(Flashcard).filter(Flashcard.german_word == s.german_word).first()
             if existing:
                 existing.seeded_from = s.id
+                linked += 1
         else:
             db.add(Flashcard(
                 id=str(uuid.uuid4()),
@@ -380,8 +393,8 @@ def _auto_enroll_next_lesson(card: Flashcard, db: Session) -> dict | None:
             ))
             added += 1
 
-    if added > 0:
-        return {"level": level, "lesson": lesson_num + 1, "enrolled": added}
+    if added + linked > 0:
+        return {"level": level, "lesson": lesson_num + 1, "enrolled": added + linked}
     return None
 
 

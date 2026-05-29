@@ -116,7 +116,7 @@ function Home() {
     getWordsOfDay().then(r => setWordsOfDay(r.data)).catch(() => {})
   }, [])
 
-  const handleAddWord = (word) => activateWord('b1', word.id)
+  const handleAddWord = (word) => activateWord(word.level.toLowerCase(), word.id)
   const activeLibraryLevels = libraryLevels.filter(l => !l.locked && l.total_words > 0)
   const hasSession = stats && (stats.due_today > 0 || stats.new_cards > 0)
   const sessionSize = stats ? Math.min((stats.due_today || 0) + (stats.new_cards || 0), 20) : 0
