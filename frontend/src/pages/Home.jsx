@@ -156,7 +156,7 @@ function Home() {
                 : 'bg-gray-700 hover:bg-gray-600 text-white'
               }`}
           >
-            {hasDue ? `Study Now (${stats.due_today})` : 'Practice Anyway'}
+            {hasDue ? `Study Now (${Math.min(stats.due_today, 20)}${stats.due_today > 20 ? ` of ${stats.due_today}` : ''})` : 'Practice Anyway'}
           </Link>
           <Link to="/library"
             className="bg-gray-700/60 hover:bg-gray-700 text-gray-200 px-5 py-2.5 rounded-xl
