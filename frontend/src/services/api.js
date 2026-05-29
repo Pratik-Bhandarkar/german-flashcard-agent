@@ -84,7 +84,3 @@ export const getFlashcardStats = () =>
 // Translation deck: cards from the Translate page
 export const getTranslationCards = () =>
   api.get('/flashcards/translations/review')
-
-// Translation deck — cards from the Translate page due for review
-export const getTranslationCards = () =>
-  api.get('/flashcards/translations/review')
