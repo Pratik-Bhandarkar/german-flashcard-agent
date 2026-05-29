@@ -14,7 +14,7 @@ from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from backend.database.db import get_db
-from backend.database.models import Flashcard
+from backend.database.models import Flashcard, SeedWord
 from pipeline.graph import run_pipeline
 from pipeline.tools import deepl_client
 
@@ -110,16 +110,18 @@ def get_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/review")
-def get_cards_due_for_review(db: Session = Depends(get_db)):
+def get_cards_due_for_review(limit: int = 20, db: Session = Depends(get_db)):
     """
-    Returns only flashcards due for review today or earlier.
-    Used by the spaced repetition study mode.
+    Returns flashcards due for review today or earlier, capped at `limit`.
+    Pass limit=0 to get all due cards.
     """
     today = date.today().isoformat()
-    flashcards = db.query(Flashcard).filter(
+    query = db.query(Flashcard).filter(
         or_(Flashcard.next_review == None, Flashcard.next_review <= today)
-    ).all()
-    return [card.to_dict() for card in flashcards]
+    )
+    if limit > 0:
+        query = query.limit(limit)
+    return [card.to_dict() for card in query.all()]
 
 
 @router.get("/{flashcard_id}")
@@ -264,24 +266,98 @@ async def process_image(
         if temp_path.exists():
             temp_path.unlink()
             
+def _auto_enroll_next_lesson(card: Flashcard, db: Session) -> dict | None:
+    """
+    After a card is reviewed, check if its lesson is now fully reviewed.
+    If so, automatically activate the next lesson's words.
+    Returns a dict with enrolled lesson info, or None.
+    """
+    if not card.seeded_from:
+        return None
+
+    seed = db.query(SeedWord).filter(SeedWord.id == card.seeded_from).first()
+    if not seed:
+        return None
+
+    level, lesson_num = seed.level, seed.lesson_number
+
+    # IDs of all seed words in this lesson
+    lesson_seed_ids = {
+        row[0] for row in
+        db.query(SeedWord.id).filter(
+            SeedWord.level == level,
+            SeedWord.lesson_number == lesson_num
+        ).all()
+    }
+
+    # Cards in the deck that belong to this lesson
+    lesson_cards = db.query(Flashcard).filter(
+        Flashcard.seeded_from.in_(lesson_seed_ids)
+    ).all()
+
+    # Lesson is complete when every activated card has been reviewed at least once
+    if not lesson_cards or any(c.last_reviewed is None for c in lesson_cards):
+        return None
+
+    # Find next lesson's seed words not yet in the deck
+    next_lesson_seeds = db.query(SeedWord).filter(
+        SeedWord.level == level,
+        SeedWord.lesson_number == lesson_num + 1,
+    ).all()
+
+    if not next_lesson_seeds:
+        return None
+
+    activated_seed_ids = {
+        row[0] for row in
+        db.query(Flashcard.seeded_from).filter(Flashcard.seeded_from.isnot(None)).all()
+    }
+    existing_words = {row[0] for row in db.query(Flashcard.german_word).all()}
+
+    added = 0
+    for s in next_lesson_seeds:
+        if s.id in activated_seed_ids:
+            continue
+        if s.german_word in existing_words:
+            existing = db.query(Flashcard).filter(Flashcard.german_word == s.german_word).first()
+            if existing:
+                existing.seeded_from = s.id
+        else:
+            db.add(Flashcard(
+                id=str(uuid.uuid4()),
+                german_word=s.german_word,
+                english_translation=s.english_translation,
+                word_class=s.word_class,
+                gender=s.gender,
+                plural_form=s.plural_form,
+                example_sentence_de=s.example_sentence_de,
+                example_sentence_en=s.example_sentence_en,
+                mnemonic=s.mnemonic,
+                gender_tip=s.gender_tip,
+                source=f"{level} library",
+                tags=[level],
+                difficulty=None,
+                next_review=None,
+                created_at=date.today().isoformat(),
+                seeded_from=s.id,
+            ))
+            added += 1
+
+    if added > 0:
+        return {"level": level, "lesson": lesson_num + 1, "enrolled": added}
+    return None
+
+
 @router.put("/{flashcard_id}")
 def update_flashcard(
     flashcard_id: str,
     request: UpdateFlashcardRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    Updates specified fields on a flashcard.
-    Used for updating difficulty after studying or editing content.
-    """
-    card = db.query(Flashcard).filter(
-        Flashcard.id == flashcard_id
-    ).first()
-
+    card = db.query(Flashcard).filter(Flashcard.id == flashcard_id).first()
     if not card:
         raise HTTPException(status_code=404, detail="Flashcard not found")
 
-    # Only update fields that were actually provided in the request
     if request.difficulty is not None:
         card.difficulty = request.difficulty
         card.last_reviewed = date.today().isoformat()
@@ -295,7 +371,17 @@ def update_flashcard(
         card.tags = request.tags
 
     db.commit()
-    return card.to_dict()
+
+    enrolled = None
+    if request.difficulty is not None:
+        enrolled = _auto_enroll_next_lesson(card, db)
+        if enrolled:
+            db.commit()
+
+    result = card.to_dict()
+    if enrolled:
+        result["lesson_unlocked"] = enrolled
+    return result
 
 
 @router.delete("/{flashcard_id}")

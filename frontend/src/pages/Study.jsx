@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getReviewCards, getAllFlashcards, updateFlashcard } from '../services/api'
+import { getReviewCards, updateFlashcard } from '../services/api'
 import { speak } from '../utils/speech'
 
 const WC_COLORS = {
@@ -26,6 +26,7 @@ function Study() {
   const [loading, setLoading] = useState(true)
   const [finished, setFinished] = useState(false)
   const [results, setResults] = useState({ easy: 0, medium: 0, hard: 0 })
+  const [unlockedLesson, setUnlockedLesson] = useState(null)
 
   useEffect(() => { fetchCards() }, [])
 
@@ -46,16 +47,20 @@ function Study() {
     setIsFlipped(false)
     setFinished(false)
     setResults({ easy: 0, medium: 0, hard: 0 })
+    setUnlockedLesson(null)
     if (newCards) setCards(newCards)
   }
 
   const handleRate = async (difficulty) => {
     const card = cards[currentIndex]
     try {
-      await updateFlashcard(card.id, {
+      const response = await updateFlashcard(card.id, {
         difficulty,
         next_review: getNextReviewDate(difficulty)
       })
+      if (response.data.lesson_unlocked) {
+        setUnlockedLesson(response.data.lesson_unlocked)
+      }
       setResults(prev => ({ ...prev, [difficulty]: prev[difficulty] + 1 }))
       if (currentIndex + 1 >= cards.length) {
         setFinished(true)
@@ -80,7 +85,7 @@ function Study() {
         onClick={async () => {
           setLoading(true)
           try {
-            const response = await getAllFlashcards()
+            const response = await getReviewCards(0)
             resetSession(response.data)
           } catch (error) {
             console.error('Failed to fetch all cards:', error)
@@ -100,6 +105,15 @@ function Study() {
       <div className="text-6xl mb-4">🎉</div>
       <h2 className="text-2xl font-bold mb-1 dark:text-white">Session Complete!</h2>
       <p className="text-gray-400 text-sm mb-8">You reviewed {cards.length} cards</p>
+
+      {unlockedLesson && (
+        <div className="bg-green-900/30 border border-green-700/50 rounded-xl p-4 mb-6 text-left">
+          <p className="text-green-400 font-semibold text-sm">Lesson unlocked!</p>
+          <p className="text-gray-300 text-sm mt-1">
+            {unlockedLesson.level} Lesson {unlockedLesson.lesson} — {unlockedLesson.enrolled} new words added to your deck.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-3 mb-8">
         <div className="bg-red-900/30 border border-red-800/40 rounded-xl p-4 text-center">
@@ -138,6 +152,14 @@ function Study() {
 
   return (
     <div className="max-w-lg mx-auto">
+      {unlockedLesson && (
+        <div className="bg-green-900/30 border border-green-700/50 rounded-xl px-4 py-3 mb-4 flex justify-between items-center">
+          <p className="text-green-400 text-sm font-medium">
+            Lesson unlocked! {unlockedLesson.level} L{unlockedLesson.lesson} — {unlockedLesson.enrolled} new words added.
+          </p>
+          <button onClick={() => setUnlockedLesson(null)} className="text-gray-500 hover:text-gray-300 text-xs ml-3">✕</button>
+        </div>
+      )}
       {/* Progress */}
       <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-3">
         <span>Card {currentIndex + 1} of {cards.length}</span>

@@ -36,7 +36,8 @@ def get_words_of_day(db: Session = Depends(get_db)):
         row[0] for row in
         db.query(Flashcard.seeded_from).filter(Flashcard.seeded_from.isnot(None)).all()
     }
-    all_words = db.query(SeedWord).filter(SeedWord.level == "B1").all()
+    unlocked_levels = [m["level"] for m in _CEFR_LEVELS if not m["locked"]]
+    all_words = db.query(SeedWord).filter(SeedWord.level.in_(unlocked_levels)).all()
     pool = sorted([w for w in all_words if w.id not in activated_ids], key=lambda w: w.id)
     if not pool:
         pool = sorted(all_words, key=lambda w: w.id)

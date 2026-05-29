@@ -19,9 +19,9 @@ const api = axios.create({
 export const getAllFlashcards = () =>
   api.get('/flashcards')
 
-// Fetch cards due for review today
-export const getReviewCards = () =>
-  api.get('/flashcards/review')
+// Fetch cards due for review (capped at 20 by default; pass 0 for all)
+export const getReviewCards = (limit = 20) =>
+  api.get('/flashcards/review', { params: limit === 0 ? { limit: 0 } : {} })
 
 // Process plain text through the pipeline
 export const processText = (text, source, tags) =>
