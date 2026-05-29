@@ -80,3 +80,7 @@ export const getWordsOfDay = () =>
 // Flashcard stats: due today, total, streak
 export const getFlashcardStats = () =>
   api.get('/flashcards/stats')
+
+// Translation deck — cards from the Translate page due for review
+export const getTranslationCards = () =>
+  api.get('/flashcards/translations/review')

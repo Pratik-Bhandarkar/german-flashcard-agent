@@ -92,7 +92,8 @@ def get_all_flashcards(db: Session = Depends(get_db)):
 def get_stats(db: Session = Depends(get_db)):
     today = date.today().isoformat()
     due_today = db.query(func.count(Flashcard.id)).filter(
-        or_(Flashcard.next_review == None, Flashcard.next_review <= today)
+        or_(Flashcard.next_review == None, Flashcard.next_review <= today),
+        Flashcard.source != "translator",
     ).scalar() or 0
     total = db.query(func.count(Flashcard.id)).scalar() or 0
 
@@ -112,16 +113,28 @@ def get_stats(db: Session = Depends(get_db)):
 @router.get("/review")
 def get_cards_due_for_review(limit: int = 20, db: Session = Depends(get_db)):
     """
-    Returns flashcards due for review today or earlier, capped at `limit`.
+    Returns main deck cards due for review (excludes translator cards).
     Pass limit=0 to get all due cards.
     """
     today = date.today().isoformat()
     query = db.query(Flashcard).filter(
-        or_(Flashcard.next_review == None, Flashcard.next_review <= today)
+        or_(Flashcard.next_review == None, Flashcard.next_review <= today),
+        Flashcard.source != "translator",
     )
     if limit > 0:
         query = query.limit(limit)
     return [card.to_dict() for card in query.all()]
+
+
+@router.get("/translations/review")
+def get_translation_cards_due(db: Session = Depends(get_db)):
+    """Returns translator cards due for review (no cap)."""
+    today = date.today().isoformat()
+    cards = db.query(Flashcard).filter(
+        or_(Flashcard.next_review == None, Flashcard.next_review <= today),
+        Flashcard.source == "translator",
+    ).all()
+    return [card.to_dict() for card in cards]
 
 
 @router.get("/{flashcard_id}")
