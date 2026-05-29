@@ -147,13 +147,18 @@ def get_cards_due_for_review(limit: int = 20, db: Session = Depends(get_db)):
 
 @router.get("/translations/review")
 def get_translation_cards_due(db: Session = Depends(get_db)):
-    """Returns translator cards due for review (no cap)."""
+    """Returns translator deck: spaced-rep reviews first, then new cards."""
     today = date.today().isoformat()
-    cards = db.query(Flashcard).filter(
-        or_(Flashcard.next_review == None, Flashcard.next_review <= today),
+    reviews = db.query(Flashcard).filter(
         Flashcard.source == "translator",
+        Flashcard.last_reviewed.isnot(None),
+        Flashcard.next_review <= today,
+    ).order_by(Flashcard.next_review.asc()).all()
+    new_cards = db.query(Flashcard).filter(
+        Flashcard.source == "translator",
+        Flashcard.last_reviewed.is_(None),
     ).all()
-    return [card.to_dict() for card in cards]
+    return [c.to_dict() for c in reviews + new_cards]
 
 
 @router.get("/{flashcard_id}")

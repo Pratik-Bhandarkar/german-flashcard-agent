@@ -24,6 +24,7 @@ function TranslationDeck() {
   const [loading, setLoading] = useState(true)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
+  const [instantFlip, setInstantFlip] = useState(false)
   const [done, setDone] = useState(false)
   const [open, setOpen] = useState(false)
 
@@ -42,6 +43,14 @@ function TranslationDeck() {
 
   useEffect(() => { fetchCards() }, [fetchCards])
 
+  // Auto-play when card changes and deck is open
+  useEffect(() => {
+    if (open && cards.length > 0 && !done) {
+      const card = cards[currentIndex]
+      speak(card.gender ? `${card.gender} ${card.german_word}` : card.german_word)
+    }
+  }, [currentIndex, cards, open])
+
   const handleRate = async (difficulty) => {
     const card = cards[currentIndex]
     try {
@@ -52,8 +61,10 @@ function TranslationDeck() {
       if (currentIndex + 1 >= cards.length) {
         setDone(true)
       } else {
-        setCurrentIndex(i => i + 1)
+        setInstantFlip(true)
         setIsFlipped(false)
+        setCurrentIndex(i => i + 1)
+        requestAnimationFrame(() => setInstantFlip(false))
       }
     } catch (err) {
       console.error('Failed to update card:', err)
@@ -115,7 +126,7 @@ function TranslationDeck() {
                 const wcColor = WC_COLORS[card.word_class] || 'text-gray-400'
                 return (
                   <div className="card-container" onClick={() => setIsFlipped(f => !f)}>
-                    <div className={`card-inner shadow-lg ${isFlipped ? 'is-flipped' : ''}`}>
+                    <div className={`card-inner shadow-lg ${isFlipped ? 'is-flipped' : ''} ${instantFlip ? 'instant' : ''}`}>
                       <div className="card-face border-2 rounded-2xl p-8 flex flex-col justify-center items-center text-center
                                       hover:border-blue-500/60 transition-colors dark:border-gray-700 dark:bg-gray-800/90">
                         <p className="text-gray-500 text-xs uppercase tracking-widest mb-4">German</p>
@@ -130,7 +141,7 @@ function TranslationDeck() {
                         </h2>
                         {card.plural_form && <p className="text-gray-500 mt-2 text-sm">({card.plural_form})</p>}
                         <button
-                          onClick={e => { e.stopPropagation(); speak(card.german_word) }}
+                          onClick={e => { e.stopPropagation(); speak(card.gender ? `${card.gender} ${card.german_word}` : card.german_word) }}
                           className="mt-4 text-gray-500 hover:text-blue-400 transition-colors text-xl"
                           title="Pronounce"
                         >🔊</button>
