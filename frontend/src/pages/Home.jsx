@@ -118,7 +118,8 @@ function Home() {
 
   const handleAddWord = (word) => activateWord('b1', word.id)
   const activeLibraryLevels = libraryLevels.filter(l => !l.locked && l.total_words > 0)
-  const hasDue = stats && stats.due_today > 0
+  const hasSession = stats && (stats.due_today > 0 || stats.new_cards > 0)
+  const sessionSize = stats ? Math.min((stats.due_today || 0) + (stats.new_cards || 0), 20) : 0
 
   return (
     <div className="space-y-8">
@@ -129,16 +130,21 @@ function Home() {
         <h2 className="text-3xl font-bold text-white mb-1">Guten Tag! 👋</h2>
         <p className="text-gray-400 text-sm">Your German vocabulary coach is ready.</p>
 
-        <div className="grid grid-cols-3 gap-3 mt-6">
+        <div className="grid grid-cols-4 gap-3 mt-6">
           <StatBox
             value={stats ? `${stats.streak}🔥` : null}
             label="Day streak"
             color="text-orange-400"
           />
           <StatBox
-            value={stats?.due_today}
-            label="Due today"
+            value={stats?.due_today ?? '—'}
+            label="To review"
             color="text-blue-400"
+          />
+          <StatBox
+            value={stats?.new_cards ?? '—'}
+            label="New"
+            color="text-purple-400"
           />
           <StatBox
             value={stats?.total}
@@ -151,12 +157,12 @@ function Home() {
           <Link
             to="/study"
             className={`px-5 py-2.5 rounded-xl font-medium transition-all active:scale-95
-              ${hasDue
+              ${hasSession
                 ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/40'
                 : 'bg-gray-700 hover:bg-gray-600 text-white'
               }`}
           >
-            {hasDue ? `Study Now (${Math.min(stats.due_today, 20)}${stats.due_today > 20 ? ` of ${stats.due_today}` : ''})` : 'Practice Anyway'}
+            {hasSession ? `Study Now (${sessionSize})` : 'Nothing due'}
           </Link>
           <Link to="/library"
             className="bg-gray-700/60 hover:bg-gray-700 text-gray-200 px-5 py-2.5 rounded-xl

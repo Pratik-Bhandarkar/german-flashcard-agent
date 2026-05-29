@@ -91,10 +91,20 @@ def get_all_flashcards(db: Session = Depends(get_db)):
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db)):
     today = date.today().isoformat()
+
+    # Cards previously studied that are due for spaced repetition review
     due_today = db.query(func.count(Flashcard.id)).filter(
-        or_(Flashcard.next_review == None, Flashcard.next_review <= today),
+        Flashcard.last_reviewed.isnot(None),
+        Flashcard.next_review <= today,
         Flashcard.source != "translator",
     ).scalar() or 0
+
+    # Cards never studied yet (new, waiting to be introduced)
+    new_cards = db.query(func.count(Flashcard.id)).filter(
+        Flashcard.last_reviewed.is_(None),
+        Flashcard.source != "translator",
+    ).scalar() or 0
+
     total = db.query(func.count(Flashcard.id)).scalar() or 0
 
     reviewed_dates = {
@@ -107,23 +117,32 @@ def get_stats(db: Session = Depends(get_db)):
         streak += 1
         check -= timedelta(days=1)
 
-    return {"due_today": due_today, "total": total, "streak": streak}
+    return {"due_today": due_today, "new_cards": new_cards, "total": total, "streak": streak}
 
 
 @router.get("/review")
 def get_cards_due_for_review(limit: int = 20, db: Session = Depends(get_db)):
     """
-    Returns main deck cards due for review (excludes translator cards).
-    Pass limit=0 to get all due cards.
+    Returns main deck session: spaced-rep reviews first (most overdue first),
+    then new cards to fill remaining slots. Capped at `limit` (0 = no cap).
     """
     today = date.today().isoformat()
-    query = db.query(Flashcard).filter(
-        or_(Flashcard.next_review == None, Flashcard.next_review <= today),
+
+    reviews = db.query(Flashcard).filter(
+        Flashcard.last_reviewed.isnot(None),
+        Flashcard.next_review <= today,
         Flashcard.source != "translator",
-    )
+    ).order_by(Flashcard.next_review.asc()).all()
+
+    new_cards = db.query(Flashcard).filter(
+        Flashcard.last_reviewed.is_(None),
+        Flashcard.source != "translator",
+    ).all()
+
+    combined = reviews + new_cards
     if limit > 0:
-        query = query.limit(limit)
-    return [card.to_dict() for card in query.all()]
+        combined = combined[:limit]
+    return [c.to_dict() for c in combined]
 
 
 @router.get("/translations/review")
