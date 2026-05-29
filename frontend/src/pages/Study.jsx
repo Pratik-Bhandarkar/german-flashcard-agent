@@ -27,6 +27,7 @@ function Study() {
   const [finished, setFinished] = useState(false)
   const [results, setResults] = useState({ easy: 0, medium: 0, hard: 0 })
   const [unlockedLesson, setUnlockedLesson] = useState(null)
+  const [instantFlip, setInstantFlip] = useState(false)
 
   useEffect(() => { fetchCards() }, [])
 
@@ -73,8 +74,10 @@ function Study() {
       if (currentIndex + 1 >= cards.length) {
         setFinished(true)
       } else {
-        setCurrentIndex(currentIndex + 1)
+        setInstantFlip(true)
         setIsFlipped(false)
+        setCurrentIndex(currentIndex + 1)
+        requestAnimationFrame(() => setInstantFlip(false))
       }
     } catch (error) {
       console.error('Failed to update card:', error)
@@ -182,7 +185,7 @@ function Study() {
 
       {/* Flip card */}
       <div className="card-container" onClick={() => setIsFlipped(!isFlipped)}>
-        <div className={`card-inner shadow-lg ${isFlipped ? 'is-flipped' : ''}`}>
+        <div className={`card-inner shadow-lg ${isFlipped ? 'is-flipped' : ''} ${instantFlip ? 'instant' : ''}`}>
 
           {/* Front */}
           <div className="card-face border-2 rounded-2xl p-8

@@ -23,6 +23,10 @@ body {
   transform: rotateY(180deg);
 }
 
+.card-inner.instant {
+  transition: none;
+}
+
 .card-face {
   position: absolute;
   inset: 0;
