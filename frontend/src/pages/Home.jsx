@@ -52,7 +52,7 @@ function WordCard({ word, onAdd }) {
           <div className="flex items-center justify-center gap-3 mt-3">
             <p className="text-gray-500 text-xs">tap to reveal</p>
             <button
-              onClick={(e) => { e.stopPropagation(); speak(word.german_word) }}
+              onClick={(e) => { e.stopPropagation(); speak(word.gender ? `${word.gender} ${word.german_word}` : word.german_word) }}
               className="text-gray-500 hover:text-blue-400 transition-colors text-base leading-none"
               title="Pronounce"
             >
